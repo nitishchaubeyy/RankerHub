@@ -2,7 +2,6 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  Mail,
   ArrowLeft,
   TrendingUp,
   Code2,
@@ -12,7 +11,6 @@ import {
   Info,
   Heart
 } from "lucide-react";
-import { Github, Linkedin, Instagram } from "../components/ui/Icons";
 import Card from "../components/ui/Card";
 import ThemeToggle from "../components/ui/ThemeToggle";
 
@@ -50,32 +48,7 @@ export const About = () => {
     }
   ];
 
-  const owners = [
-    {
-      name: "Indresh Suresh",
-      role: "Project Owner & Lead Architect",
-      bio: "Full-stack developer focused on creating performant, interactive web systems and developer environments. Passionate about software craftsmanship, clean UI animations, and automated ranking models.",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200", // High quality profile image
-      links: {
-        github: "https://github.com/indresh404",
-        linkedin: "https://linkedin.com/in/indresh-suresh-093646399",
-        instagram: "https://www.instagram.com/indresh_suresh/",
-        email: "mailto:indreshsuresh95@gmail.com"
-      }
-    },
-    {
-      name: "Divya Sharma",
-      role: "Project Owner & UX Director",
-      bio: "Product designer and manager specialising in community growth, layout optimization, and accessibility. Dedicated to building engaging developer ecosystems and scaling inclusive open-source project initiatives.",
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200", // High quality profile image
-      links: {
-        github: "https://github.com/divyagsharma2006-blip",
-        linkedin: "https://www.linkedin.com/in/divya-sharma-57673536b",
-        instagram: "https://www.instagram.com/_s.divyaaaa/",
-        email: "mailto:indreshsuresh95@gmail.com"
-      }
-    }
-  ];
+
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -191,90 +164,6 @@ export const About = () => {
           </div>
         </motion.section>
 
-        {/* Project Owners Block */}
-        <motion.section 
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={fadeInUp}
-          className="space-y-8"
-        >
-          <div className="text-center space-y-1">
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white my-0">Meet the Project Owners</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
-              The creative visionaries and architects driving the RankerHub engineering ecosystem.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {owners.map((owner, idx) => (
-              <Card
-                key={idx}
-                className="p-8 bg-white/40 dark:bg-slate-950/40 border-slate-200/40 dark:border-slate-800/40 backdrop-blur-2xl hover:border-violet-500/20 transition-all duration-300 flex flex-col justify-between"
-              >
-                <div className="space-y-6">
-                  {/* Owner Header Info */}
-                  <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
-                    <div className="w-16 h-16 rounded-2xl overflow-hidden ring-4 ring-slate-200/40 dark:ring-slate-800/40 flex-shrink-0">
-                      <img src={owner.avatar} alt={owner.name} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="text-lg font-extrabold text-slate-900 dark:text-white my-0 leading-tight">
-                        {owner.name}
-                      </h3>
-                      <span className="text-xs font-bold text-violet-600 dark:text-violet-400 block">
-                        {owner.role}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Bio */}
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-semibold my-0 text-center sm:text-left">
-                    {owner.bio}
-                  </p>
-                </div>
-
-                {/* Connection Links */}
-                <div className="mt-8 pt-6 border-t border-slate-200/40 dark:border-slate-800/40 flex justify-center sm:justify-start gap-3">
-                  <a
-                    href={owner.links.github}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition duration-200 cursor-pointer"
-                    title="GitHub"
-                  >
-                    <Github className="w-4 h-4" />
-                  </a>
-                  <a
-                    href={owner.links.linkedin}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition duration-200 cursor-pointer"
-                    title="LinkedIn"
-                  >
-                    <Linkedin className="w-4 h-4" />
-                  </a>
-                  <a
-                    href={owner.links.instagram}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition duration-200 cursor-pointer"
-                    title="Instagram"
-                  >
-                    <Instagram className="w-4 h-4" />
-                  </a>
-                  <a
-                    href={owner.links.email}
-                    className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition duration-200 cursor-pointer"
-                    title="Email Contact"
-                  >
-                    <Mail className="w-4 h-4" />
-                  </a>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </motion.section>
 
         {/* Community & Contributors Section */}
         <motion.section
@@ -314,6 +203,12 @@ export const About = () => {
                 profileLink="https://github.com/indresh404"
                 description="Creator of RankerHub and core architect behind the platform."
                 isOwner={true}
+                links={{
+                  github: "https://github.com/indresh404",
+                  linkedin: "https://www.linkedin.com/in/indresh-suresh-093646399",
+                  instagram: "https://www.instagram.com/indresh_suresh/",
+                  email: "mailto:indreshsuresh95@gmail.com"
+                }}
               />
               <TeamCard
                 username="divyagsharma2006-blip"
@@ -322,6 +217,12 @@ export const About = () => {
                 profileLink="https://github.com/divyagsharma2006-blip"
                 description="Helping improve RankerHub through collaboration, features, and community contributions."
                 isOwner={true}
+                links={{
+                  github: "https://github.com/divyagsharma2006-blip",
+                  linkedin: "https://www.linkedin.com/in/divya-sharma-57673536b",
+                  instagram: "https://www.instagram.com/_s.divyaaaa/",
+                  email: "mailto:indreshsuresh95@gmail.com"
+                }}
               />
             </div>
           </div>

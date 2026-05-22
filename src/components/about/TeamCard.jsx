@@ -1,9 +1,9 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Heart } from "lucide-react";
-import { Github } from "../ui/Icons";
+import { Heart, Mail } from "lucide-react";
+import { Github, Linkedin, Instagram } from "../ui/Icons";
 
-export const TeamCard = ({ username, avatar, role, profileLink, description, isOwner, className = "" }) => {
+export const TeamCard = ({ username, avatar, role, profileLink, description, isOwner, links, className = "" }) => {
   return (
     <motion.div
       whileHover={{ y: -6, scale: 1.02 }}
@@ -60,21 +60,53 @@ export const TeamCard = ({ username, avatar, role, profileLink, description, isO
           {description}
         </p>
         
-        <a
-          href={profileLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`
-            inline-flex items-center gap-1.5 text-xs font-bold transition duration-200 cursor-pointer
-            ${isOwner 
-              ? "text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300"
-              : "text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
-            }
-          `}
-          aria-label={`${username} GitHub profile`}
-        >
-          <Github className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform duration-300" /> github.com/{username}
-        </a>
+        {/* Connection Links */}
+        {links && (
+          <div className="mt-4 pt-3 border-t border-slate-200/40 dark:border-slate-800/40 flex justify-center sm:justify-start gap-3">
+            {links.github && (
+              <a
+                href={links.github}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition duration-200 cursor-pointer"
+                title="GitHub"
+              >
+                <Github className="w-4 h-4" />
+              </a>
+            )}
+            {links.linkedin && (
+              <a
+                href={links.linkedin}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition duration-200 cursor-pointer"
+                title="LinkedIn"
+              >
+                <Linkedin className="w-4 h-4" />
+              </a>
+            )}
+            {links.instagram && (
+              <a
+                href={links.instagram}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition duration-200 cursor-pointer"
+                title="Instagram"
+              >
+                <Instagram className="w-4 h-4" />
+              </a>
+            )}
+            {links.email && (
+              <a
+                href={links.email}
+                className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition duration-200 cursor-pointer"
+                title="Email Contact"
+              >
+                <Mail className="w-4 h-4" />
+              </a>
+            )}
+          </div>
+        )}
       </div>
     </motion.div>
   );
