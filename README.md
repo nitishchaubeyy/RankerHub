@@ -33,16 +33,16 @@ npm run dev
 
 ## 🔑 Environment Variables
 
-Create a `.env` file and add:
+## Environment Variables
 
-```env
+Create a `.env` file in the root directory and add:
 VITE_FIREBASE_API_KEY=
 VITE_FIREBASE_AUTH_DOMAIN=
 VITE_FIREBASE_PROJECT_ID=
 VITE_FIREBASE_STORAGE_BUCKET=
 VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
-```
+VITE_FIREBASE_MEASUREMENT_ID=
 
 ## 🚀 Future Plans
 
@@ -54,7 +54,7 @@ VITE_FIREBASE_APP_ID=
 
 ## 🤝 Contributing
 
-Contributions are welcome! Feel free to fork the project and submit a PR....
+Contributions are welcome! Feel free to fork the project and submit a PR.
 
 ## 📄 License
 
