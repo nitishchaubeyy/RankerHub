@@ -107,11 +107,14 @@ export const Home = () => {
                 Get Started <ArrowRight className="w-4 h-4 ml-1" />
               </GradientButton>
             </Link>
-            <Link to="/gitrank">
-              <GradientButton variant="secondary" className="w-full sm:w-auto">
-                Explore GitRank
-              </GradientButton>
-            </Link>
+ <a href="https://github.com/indresh404/RankerHub"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <GradientButton variant="secondary" className="w-full sm:w-auto">
+    View on GitHub
+  </GradientButton>
+</a>
           </motion.div>
         </motion.div>
       </section>
