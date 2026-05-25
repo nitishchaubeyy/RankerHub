@@ -4,8 +4,10 @@ import { Bell, Search, Menu, X, Check, Trash2, ArrowUpRight } from "lucide-react
 import { motion, AnimatePresence } from "framer-motion";
 import ThemeToggle from "../ui/ThemeToggle";
 import { mockNotifications } from "../../data/activities";
+import { useAuth } from "../../context/AuthContext";
 
 export const Navbar = ({ toggleMobile, isMobileOpen }) => {
+  const { user, userData } = useAuth();
   const [notifications, setNotifications] = useState(mockNotifications);
   const [showNotifications, setShowNotifications] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -69,7 +71,7 @@ export const Navbar = ({ toggleMobile, isMobileOpen }) => {
             Welcome back
           </span>
           <span className="text-sm md:text-base font-bold text-slate-800 dark:text-slate-100 mt-0.5 block">
-            {greeting}, <span className="text-violet-600 dark:text-violet-400 font-extrabold">Indresh</span> 👋
+            {greeting}, <span className="text-violet-600 dark:text-violet-400 font-extrabold">{userData?.name || user?.displayName || userData?.githubUsername || "Developer"}</span> 👋
           </span>
         </motion.div>
       </div>
@@ -205,11 +207,11 @@ export const Navbar = ({ toggleMobile, isMobileOpen }) => {
         </div>
 
         {/* Profile Avatar */}
-        <Link to="/profile" className="flex items-center gap-2 group cursor-pointer">
+        <Link to="/dashboard/profile" className="flex items-center gap-2 group cursor-pointer">
           <div className="w-9 h-9 rounded-xl overflow-hidden ring-2 ring-violet-500/20 group-hover:ring-violet-500/50 transition-all duration-200">
             <img
-              src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200"
-              alt="Indresh Profile"
+              src={userData?.avatar || user?.photoURL || "https://avatars.githubusercontent.com/u/9919?v=4"}
+              alt="User Profile"
               className="w-full h-full object-cover"
             />
           </div>

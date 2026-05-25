@@ -1,6 +1,9 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import LottiePlayer from "../components/ui/LottiePlayer";
 import { Award, Zap, Code, ShieldCheck, Flame, ArrowUpRight } from "lucide-react";
+import { query, collection, where, getCountFromServer } from "firebase/firestore";
+import { db } from "../lib/firebase";
+import { useAuth } from "../context/AuthContext";
 import trophyAnimation from "../assets/animations/trophy.json";
 import SectionHeader from "../components/ui/SectionHeader";
 import Card from "../components/ui/Card";
@@ -11,7 +14,6 @@ import ActivityFeed from "../components/dashboard/ActivityFeed";
 import GradientButton from "../components/ui/GradientButton";
 
 // Generate dummy data for GitHub contribution graph mockup
-// 52 weeks * 7 days = 364 cells. We'll show a compact 24-column grid (168 cells) for responsiveness.
 const heatmapColors = [
   "bg-slate-100 dark:bg-slate-800/40", // 0 contributions
   "bg-violet-500/10 dark:bg-violet-500/10", // low
@@ -21,7 +23,6 @@ const heatmapColors = [
 ];
 
 const heatmapCells = Array.from({ length: 168 }, () => {
-  // Weighted distribution to look like actual active coding
   const rand = Math.random();
   if (rand < 0.35) return 0;
   if (rand < 0.65) return 1;
@@ -31,20 +32,49 @@ const heatmapCells = Array.from({ length: 168 }, () => {
 });
 
 export const Dashboard = () => {
+  const { userData } = useAuth();
+  const [rank, setRank] = useState("Loading...");
+
+  // Optimized rank count query
+  useEffect(() => {
+    if (!userData || !userData.points) return;
+
+    const fetchRank = async () => {
+      try {
+        const q = query(
+          collection(db, "users"),
+          where("points.totalPoints", ">", userData.points.totalPoints)
+        );
+        const snapshot = await getCountFromServer(q);
+        const currentRank = snapshot.data().count + 1;
+        setRank(`#${currentRank}`);
+      } catch (err) {
+        console.error("Error calculating dynamic rank:", err);
+        setRank("#N/A");
+      }
+    };
+
+    fetchRank();
+  }, [userData]);
+
+  const totalPoints = userData?.points?.totalPoints || 0;
+  const devLevel = Math.floor(totalPoints / 250) + 1;
+  const nextLevelPoints = devLevel * 250;
+  const levelProgressPercent = Math.min(100, Math.floor((totalPoints / nextLevelPoints) * 100));
 
   const challenges = [
     {
       title: "Binary Tree Level Order Traversal",
       difficulty: "Medium",
       diffColor: "bg-amber-500/10 text-amber-500 border-amber-500/20",
-      points: "+40 XP",
+      points: "+10 CP",
       category: "Trees / BFS"
     },
     {
       title: "LRU Cache Implementation",
       difficulty: "Hard",
       diffColor: "bg-red-500/10 text-red-500 border-red-500/20",
-      points: "+70 XP",
+      points: "+20 CP",
       category: "Design / DLL"
     }
   ];
@@ -55,7 +85,7 @@ export const Dashboard = () => {
       {/* Page Header */}
       <SectionHeader
         title="Overview Dashboard"
-        subtitle="Track your progress, achievements, and ranking rankings in real-time."
+        subtitle="Track your progress, achievements, and rankings in real-time."
         badge="Live Metrics"
       />
 
@@ -66,22 +96,25 @@ export const Dashboard = () => {
         <Card className="lg:col-span-2 flex flex-col sm:flex-row items-center justify-between gap-6 p-8 bg-gradient-to-br from-violet-600/10 via-indigo-600/10 to-blue-600/10 border-violet-500/15">
           <div className="space-y-4 text-center sm:text-left">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-violet-600/20 text-violet-700 dark:text-violet-400">
-              <Award className="w-4 h-4 animate-bounce" /> Level 24 Developer
+              <Award className="w-4 h-4 animate-bounce" /> Level {devLevel} Developer
             </div>
             
             <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white leading-tight my-0">
-              Rank Points Milestone Reached!
+              Welcome back, {userData?.name || "Developer"}!
             </h2>
             
             <p className="text-sm md:text-base text-slate-500 dark:text-slate-400 max-w-md font-medium">
-              You are currently ranked <span className="font-bold text-slate-800 dark:text-white">#4</span> globally. Unlock the next rank by completing 2 more daily challenges.
+              You are currently ranked <span className="font-bold text-slate-800 dark:text-white">{rank}</span> globally. Complete daily arena challenges to boost your rank!
             </p>
 
             <div className="pt-2 flex items-center justify-center sm:justify-start gap-4">
               <div className="w-full max-w-[200px] h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-violet-600 to-indigo-600 rounded-full w-[82%]" />
+                <div 
+                  className="h-full bg-gradient-to-r from-violet-600 to-indigo-600 rounded-full transition-all duration-500" 
+                  style={{ width: `${levelProgressPercent}%` }}
+                />
               </div>
-              <span className="text-xs font-bold text-slate-500">8,120 / 10,000 XP</span>
+              <span className="text-xs font-bold text-slate-500">{totalPoints} / {nextLevelPoints} XP</span>
             </div>
           </div>
 
@@ -103,23 +136,28 @@ export const Dashboard = () => {
             {/* Visual Skill Indicators */}
             <div className="space-y-2.5 pt-2">
               {[
-                { label: "Problem Solving", percent: 88, color: "bg-purple-500" },
-                { label: "Git Contribution", percent: 75, color: "bg-blue-500" },
-                { label: "Consistency", percent: 92, color: "bg-orange-500" }
-              ].map((skill, idx) => (
-                <div key={idx} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-                    <span>{skill.label}</span>
-                    <span>{skill.percent}%</span>
+                { label: "GitRank (GitHub)", points: userData?.points?.gitRankPoints || 0, color: "bg-blue-500" },
+                { label: "CodingVerse", points: userData?.points?.codingVersePoints || 0, color: "bg-purple-500" },
+                { label: "Streak Points", points: userData?.points?.streakPoints || 0, color: "bg-orange-500" },
+                { label: "Referral Points", points: userData?.points?.referralPoints || 0, color: "bg-emerald-500" }
+              ].map((skill, idx) => {
+                const maxPoints = Math.max(10, totalPoints);
+                const percent = Math.min(100, Math.floor((skill.points / maxPoints) * 100)) || 0;
+                return (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                      <span>{skill.label}</span>
+                      <span>{skill.points} pts</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-100 dark:bg-slate-800/80 rounded-full overflow-hidden">
+                      <div
+                        style={{ width: `${percent}%` }}
+                        className={`h-full ${skill.color} rounded-full transition-all duration-300`}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full h-2 bg-slate-100 dark:bg-slate-800/80 rounded-full overflow-hidden">
-                    <div
-                      style={{ width: `${skill.percent}%` }}
-                      className={`h-full ${skill.color} rounded-full`}
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -174,7 +212,7 @@ export const Dashboard = () => {
               </div>
               <span>More</span>
             </div>
-            <span>Activity logged from github.com/indresh404</span>
+            <span>Activity logged from github.com/{userData?.githubUsername || "developer"}</span>
           </div>
         </Card>
 

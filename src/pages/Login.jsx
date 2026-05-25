@@ -1,16 +1,41 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ShieldCheck, ArrowRight, AlertCircle, Sparkles } from "lucide-react";
 import { Github } from "../components/ui/Icons";
 import Card from "../components/ui/Card";
 import GradientButton from "../components/ui/GradientButton";
-import { signInWithGitHub } from "../lib/firebase";
+import { useAuth } from "../context/AuthContext";
 
 export const Login = () => {
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+
+  // Extract referral parameters from URL (e.g. ?ref=NEWCODE or #/login?ref=NEWCODE)
+  useEffect(() => {
+    const getQueryParam = (name) => {
+      // 1. Check window.location.search
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.has(name)) return searchParams.get(name);
+      
+      // 2. Check hash route queries (e.g. hash router /#/login?ref=NEWCODE)
+      const hash = window.location.hash;
+      const qIndex = hash.indexOf("?");
+      if (qIndex !== -1) {
+        const hashParams = new URLSearchParams(hash.substring(qIndex));
+        if (hashParams.has(name)) return hashParams.get(name);
+      }
+      return null;
+    };
+
+    const refCode = getQueryParam("ref");
+    if (refCode) {
+      sessionStorage.setItem("referred_by_code", refCode.toUpperCase().trim());
+      console.log("Referral link detected and stored:", refCode.toUpperCase());
+    }
+  }, []);
 
   const handleGithubSignIn = async (e) => {
     e.preventDefault();
@@ -18,9 +43,11 @@ export const Login = () => {
     setError("");
     
     try {
-      const result = await signInWithGitHub();
-      console.log("User signed in:", result.user.email);
-      navigate("/dashboard");
+      const activeUser = await login();
+      console.log("Logged in dynamically via context:", activeUser.email);
+      // Don't navigate here — let the auth state change + route guards handle
+      // the redirect. The GuestRoute on /login will auto-redirect to /onboarding
+      // or /dashboard once AuthContext resolves the user's onboarding status.
     } catch (error) {
       console.error("GitHub sign-in error:", error);
       setError(error.message || "Failed to sign in with GitHub. Please try again.");

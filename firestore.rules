@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: Is the user authenticated?
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: Is the document owned by the active user?
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      // Leaderboard requires anyone logged in to view profiles
+      allow read: if isAuthenticated();
+
+      // Creation: A logged in user can provision a skeletal profile or onboarding document
+      allow create: if isOwner(uid) 
+        && request.resource.data.city == "Mumbai"
+        && (request.resource.data.onboardingStatus == "incomplete" || request.resource.data.onboardingStatus == "complete");
+
+      // Updates: Let the user update their own profile, under strict rules
+      allow update: if isOwner(uid) 
+        // 1. If they were already onboarded (onboardingStatus == "complete"), they cannot change immutable onboarding fields
+        && (resource.data.onboardingStatus != "complete" || (
+             request.resource.data.gender == resource.data.gender &&
+             request.resource.data.dob == resource.data.dob &&
+             request.resource.data.city == resource.data.city &&
+             request.resource.data.college == resource.data.college &&
+             request.resource.data.linkedinUrl == resource.data.linkedinUrl &&
+             request.resource.data.instagramHandle == resource.data.instagramHandle &&
+             request.resource.data.createdAt == resource.data.createdAt
+           ))
+        // 2. Prevent the client from manually inflating their own points directly.
+        // During self-update, the total points must equal the sum of constituent points.
+        && request.resource.data.points.totalPoints == (
+             request.resource.data.points.gitRankPoints +
+             request.resource.data.points.codingVersePoints +
+             request.resource.data.points.streakPoints +
+             request.resource.data.points.referralPoints
+           )
+        // 3. Prevent arbitrary point spikes during normal client writes:
+        && (
+          // Either they are transitioning from incomplete -> complete onboarding, or setting up their initial gitRankPoints
+          (resource.data.onboardingStatus == "incomplete" && request.resource.data.onboardingStatus == "complete") ||
+          // Or points are unchanged or incremented by small, legitimate amounts (like a streak login +2, codingverse easy +5)
+          (request.resource.data.points.totalPoints == resource.data.points.totalPoints) ||
+          (request.resource.data.points.totalPoints > resource.data.points.totalPoints && request.resource.data.points.totalPoints - resource.data.points.totalPoints <= 100)
+        );
+
+      // Referrer update: Allow another user to atomically increment a referrer's referralPoints by exactly 100 points
+      // as part of the onboarding referral transaction.
+      allow update: if isAuthenticated() 
+        && request.auth.uid != uid // must be the referred user performing the write
+        && request.resource.data.points.referralPoints == resource.data.points.referralPoints + 100
+        && request.resource.data.points.totalPoints == resource.data.points.totalPoints + 100
+        && request.resource.data.points.gitRankPoints == resource.data.points.gitRankPoints
+        && request.resource.data.points.codingVersePoints == resource.data.points.codingVersePoints
+        && request.resource.data.points.streakPoints == resource.data.points.streakPoints;
+    }
+
+    match /referrals/{uid} {
+      allow read: if isAuthenticated();
+      
+      // Let the owner create their own referrals index document
+      allow create: if isOwner(uid);
+
+      // Allow either the owner to write, OR a referred user to atomically append their UID to 'usedBy' and increment totalEarned by 100
+      allow update: if isOwner(uid) || (
+        isAuthenticated()
+        && request.resource.data.usedBy.size() == resource.data.usedBy.size() + 1
+        && request.resource.data.usedBy[resource.data.usedBy.size()] == request.auth.uid
+        && request.resource.data.totalEarned == resource.data.totalEarned + 100
+      );
+    }
+    
+    // Global lock for other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

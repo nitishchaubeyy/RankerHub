@@ -153,9 +153,82 @@ export const Home = () => {
             </motion.p>
 
             {/* CTA Button */}
+      {/* Hero Section with Background Video - Slightly Increased Height */}
+      <section className="relative min-h-screen w-full py-20 md:py-28 overflow-hidden flex items-center">
+        
+        {/* 🎥 Background Video - Height set to 55% (slightly increased from 50%) */}
+        {/* Change this value to adjust video height: h-1/2 (50%), h-[55%] (55%), h-[60%] (60%), h-2/3 (66%) */}
+        <video
+          className="absolute top-0 left-0 w-full h-[90%] object-cover opacity-50 pointer-events-none"
+          src="/banner.mp4"
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="metadata"
+        />
+
+        {/* Dark/Light overlay for video area only - Must match video height */}
+        <div className="absolute top-0 left-0 w-full h-[90%] bg-white/60 dark:bg-black/60 pointer-events-none" />
+
+        {/* Content - Full height with centering */}
+        <div className="relative z-10 w-full px-6">
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={staggerContainer(0.1, 0.05)}
+            className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8 md:gap-12 text-left"
+          >
+            <div className="flex-1 space-y-6">
+              {/* Tagline Badge */}
+              <motion.span
+                variants={fadeUp()}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 backdrop-blur-sm"
+              >
+                🚀 The Developer Gamification Platform
+              </motion.span>
+
+              {/* Heading */}
+              <motion.h1
+                variants={fadeUp()}
+                className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight leading-[1.1] text-slate-900 dark:text-white my-0"
+              >
+                Level Up Your Code. <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-500">
+                  Claim Your Leaderboard Rank.
+                </span>
+              </motion.h1>
+
+              {/* Subtitle */}
+              <motion.p
+                variants={fadeUp()}
+                className="text-base sm:text-lg md:text-xl text-slate-500 dark:text-slate-400 font-medium"
+              >
+                RankerHub tracks commits, streaks, and problem-solving to gamify your software development journey. Build habits, spot-light contributions, and earn badges.
+              </motion.p>
+
+              {/* CTA Buttons */}
+              <motion.div
+                variants={fadeUp()}
+                className="flex flex-col sm:flex-row gap-4 pt-4"
+              >
+                <Link to="/login">
+                  <GradientButton className="w-full sm:w-auto flex items-center justify-center">
+                    Get Started <ArrowRight className="w-4 h-4 ml-1" />
+                  </GradientButton>
+                </Link>
+                <Link to="/gitrank">
+                  <GradientButton variant="secondary" className="w-full sm:w-auto">
+                    Explore GitRank
+                  </GradientButton>
+                </Link>
+              </motion.div>
+            </div>
+
+            {/* Big Circular Logo on the Right */}
             <motion.div
               variants={fadeUp()}
-              className="flex flex-col sm:flex-row gap-4 pt-4"
+              className="flex-shrink-0"
             >
               <Link to="/login" className="w-full sm:w-auto">
                 <GradientButton className="w-full sm:w-auto flex items-center justify-center">
@@ -173,10 +246,14 @@ export const Home = () => {
             <div className="rotating-gradient-border w-48 h-48 md:w-56 md:h-56 shadow-2xl transition-transform duration-300 hover:scale-105">
               <div className="w-[calc(100%-8px)] h-[calc(100%-8px)] rounded-full overflow-hidden flex items-center justify-center bg-white dark:bg-slate-950 z-10">
                 <img src={logo} alt="RankerHub Big Logo" className="w-full h-full object-cover" />
+              <div className="rotating-gradient-border w-48 h-48 md:w-56 md:h-56 shadow-2xl transition-transform duration-300 hover:scale-105">
+                <div className="w-[calc(100%-8px)] h-[calc(100%-8px)] rounded-full overflow-hidden flex items-center justify-center bg-white dark:bg-slate-950 z-10">
+                  <img src={logo} alt="RankerHub Big Logo" className="w-full h-full object-cover" />
+                </div>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
+        </div>
       </section>
 
       {/* Metrics Section */}

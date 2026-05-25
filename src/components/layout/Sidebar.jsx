@@ -21,6 +21,7 @@ import { Github } from "../ui/Icons";
 import { sidebarLinks, systemBadges } from "../../constants";
 import LogoutConfirmModal from "../ui/LogoutConfirmModal";
 import logo from "../../assets/logo.png";
+import { useAuth } from "../../context/AuthContext";
 
 const iconMap = {
   Home,
@@ -44,6 +45,7 @@ const isLinkActive = (pathname, path) => {
 };
 
 export const Sidebar = ({ isCollapsed, toggleCollapse }) => {
+  const { logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -52,9 +54,14 @@ export const Sidebar = ({ isCollapsed, toggleCollapse }) => {
     setShowLogoutConfirm(true);
   };
 
-  const confirmLogout = () => {
+  const confirmLogout = async () => {
     setShowLogoutConfirm(false);
-    navigate("/");
+    try {
+      await logout();
+      navigate("/");
+    } catch (error) {
+      console.error("Logout process error:", error);
+    }
   };
 
   return (
