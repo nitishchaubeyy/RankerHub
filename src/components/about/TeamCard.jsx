@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Heart, Mail } from "lucide-react";
 import { Github, Linkedin, Instagram } from "../ui/Icons";
 
-export const TeamCard = ({ username, avatar, role, profileLink, description, isOwner, links, className = "" }) => {
+export const TeamCard = ({ username, avatar, role, description, isOwner, links, className = "" }) => {
   return (
     <motion.div
       whileHover={{ y: -6, scale: 1.02 }}

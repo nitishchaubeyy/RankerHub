@@ -2,6 +2,8 @@
 
 RankerHub is a developer ranking and coding platform that helps students and developers track GitHub activity, coding performance, streaks, achievements, and leaderboard rankings in one place.
 
+---
+
 ## ✨ Features
 
 * 🔐 GitHub Authentication
@@ -14,41 +16,90 @@ RankerHub is a developer ranking and coding platform that helps students and dev
 * 👤 Developer Profiles
 * 📊 Community Leaderboards
 
+---
+
 ## 🛠️ Tech Stack
 
-* React + Vite
-* Tailwind CSS
-* Firebase Auth
-* Firestore Database
-* GitHub API
+* **Frontend**: React + Vite
+* **Styling**: Tailwind CSS
+* **Database & Auth**: Firebase Auth & Firestore Database
+* **Integration**: GitHub API
 
-## 📦 Installation
+---
 
-```bash
-git clone <repo-url>
-cd RankerHub
-npm install
-npm run dev
-```
+## 📦 Installation & Local Setup
 
-## 🔑 Environment Variables
+To set up RankerHub locally on your machine, follow these steps:
 
-Create a `.env` file in the root directory and add:
-VITE_FIREBASE_API_KEY=
-VITE_FIREBASE_AUTH_DOMAIN=
-VITE_FIREBASE_PROJECT_ID=
-VITE_FIREBASE_STORAGE_BUCKET=
-VITE_FIREBASE_MESSAGING_SENDER_ID=
-VITE_FIREBASE_APP_ID=
-VITE_FIREBASE_MEASUREMENT_ID=
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/indresh404/RankerHub.git
+   cd RankerHub
+   ```
+
+2. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Configure Environment Variables**:
+   Create a `.env` file in the root directory and add your Firebase credentials:
+   ```env
+   VITE_FIREBASE_API_KEY=your_api_key
+   VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
+   VITE_FIREBASE_PROJECT_ID=your_project_id
+   VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket
+   VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+   VITE_FIREBASE_APP_ID=your_app_id
+   VITE_FIREBASE_MEASUREMENT_ID=your_measurement_id
+   ```
+
+4. **Start the Development Server**:
+   ```bash
+   npm run dev
+   ```
+
+---
 
 ## 🌐 Live Demo
 
-[View Live](https://rankerhub.vercel.app)
+[View Live Site](https://rankerhub.vercel.app)
 
-## 📸 Screenshots
+---
 
-> Coming soon
+## ⚠️ Troubleshooting Production Build (Firebase Config Error)
+
+If you see errors like `Firebase config error: apiKey is missing` or `FirebaseError: Firebase: Error (auth/invalid-api-key)` in production, this is due to how Vite compiles environment variables.
+
+### The Problem
+* The `.env` file containing your keys is excluded from git (`.gitignore`).
+* When the project builds on a production deployment server (such as **GitHub Actions** for Firebase Hosting), Vite cannot read the `.env` file, and compiles the bundle with `undefined` values.
+
+### The Solution (For Firebase Hosting via GitHub Actions)
+To fix this, you must feed the environment variables to the GitHub Actions build pipeline:
+
+1. **Add Repository Secrets to GitHub**:
+   - Go to your GitHub repository -> **Settings** -> **Secrets and variables** -> **Actions**.
+   - Under **Repository secrets**, click **New repository secret** and add each variable:
+     * `VITE_FIREBASE_API_KEY`
+     * `VITE_FIREBASE_AUTH_DOMAIN`
+     * `VITE_FIREBASE_PROJECT_ID`
+     * `VITE_FIREBASE_STORAGE_BUCKET`
+     * `VITE_FIREBASE_MESSAGING_SENDER_ID`
+     * `VITE_FIREBASE_APP_ID`
+     * `VITE_FIREBASE_MEASUREMENT_ID`
+
+2. **Workflows Update**:
+   Our deployment workflows in [.github/workflows/firebase-hosting-merge.yml](.github/workflows/firebase-hosting-merge.yml) and [.github/workflows/firebase-hosting-pull-request.yml](.github/workflows/firebase-hosting-pull-request.yml) are set up to pass these secrets into Vite during the build phase:
+   ```yaml
+   - run: npm ci && npm run build
+     env:
+       VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+       VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+       # ... and so on
+   ```
+
+---
 
 ## 🚀 Future Plans
 
@@ -58,26 +109,20 @@ VITE_FIREBASE_MEASUREMENT_ID=
 * Advanced leaderboard algorithms
 * Open-source contribution scoring
 
-## 🐛 Found a Bug?
-
-Please open an [issue](https://github.com/indresh404/RankerHub/issues/new)
+---
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+We welcome contributions! Please check out the [Contributing Guide](CONTRIBUTING.md) for local installation instructions, git branching, and coding standards.
 
-### Steps to Contribute:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feat/your-feature`)
-3. Commit your changes (`git commit -m "feat: add feature"`)
-4. Push to branch (`git push origin feat/your-feature`)
-5. Open a Pull Request
+---
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE)
+This project is licensed under the [MIT License](LICENSE).
+
+---
 
 ## 👨‍💻 Author
 
-Made with ❤️ by the RankerHub team
+Made with ❤️ by the RankerHub team.

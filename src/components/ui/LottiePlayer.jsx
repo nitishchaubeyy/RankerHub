@@ -1,14 +1,14 @@
 import React from "react";
 import { useLottie } from "lottie-react";
 
-// Safe boundary wrapper to catch rendering/canvas errors within the Lottie library
+// Safe boundary wrapper to catch rendering/canvas _errors within the Lottie library
 class SafeLottieBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(_error) {
     return { hasError: true };
   }
 

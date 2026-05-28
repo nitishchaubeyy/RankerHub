@@ -5,6 +5,7 @@ export const sidebarLinks = [
   { label: "CodingOwl", path: "/dashboard/codingowl", icon: "BookOpen" },
   { label: "RankHer", path: "/dashboard/rankher", icon: "Sparkles" },
   { label: "Achievements", path: "/dashboard/achievements", icon: "Award" },
+  { label: "Friends", path: "/dashboard/friends", icon: "UsersRound" },
   { label: "Profile", path: "/dashboard/profile", icon: "User" },
   { label: "Settings", path: "/dashboard/settings", icon: "Settings" },
   { label: "How it works", path: "?modal=how-it-works", icon: "HelpCircle" },

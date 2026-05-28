@@ -1,39 +1,71 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Trophy, GitPullRequest, Flame, Award, ArrowUp, ArrowDown } from "lucide-react";
+import { Trophy, GitPullRequest, Flame, Award, ArrowUp } from "lucide-react";
+import { query, collection, where, getCountFromServer } from "firebase/firestore";
+import { db } from "../../lib/firebase";
+import { useAuth } from "../../context/AuthContext";
 import Card from "../ui/Card";
-import { staggerContainer, fadeUp } from "../../utils/motion";
+import { staggerContainer } from "../../utils/motion";
 
 export const StatsCards = () => {
+  const { userData } = useAuth();
+  const [rank, setRank] = useState("Loading...");
+
+  // Optimized rank count query
+  useEffect(() => {
+    if (!userData || !userData.points) return;
+
+    const fetchRank = async () => {
+      try {
+        const q = query(
+          collection(db, "users"),
+          where("points.totalPoints", ">", userData.points.totalPoints)
+        );
+        const snapshot = await getCountFromServer(q);
+        const currentRank = snapshot.data().count + 1;
+        setRank(`#${currentRank}`);
+      } catch (err) {
+        console.error("Error calculating dynamic rank:", err);
+        setRank("#N/A");
+      }
+    };
+
+    fetchRank();
+  }, [userData]);
+
+  const totalPoints = userData?.points?.totalPoints || 0;
+  const gitCommits = userData?.githubStats?.commits || 0;
+  const streak = userData?.streak || 1;
+
   const stats = [
     {
       title: "Current Rank",
-      value: "#4",
-      subtext: "+2 ranks this week",
+      value: rank,
+      subtext: rank === "Loading..." ? "Calculating..." : "Live platform rank",
       trend: "up",
       icon: Trophy,
       color: "text-amber-500 bg-amber-500/10 border-amber-500/20"
     },
     {
-      title: "Total Contributions",
-      value: "984",
-      subtext: "+12.4% vs last month",
+      title: "GitHub Commits",
+      value: gitCommits.toLocaleString(),
+      subtext: "Verified contribution commits",
       trend: "up",
       icon: GitPullRequest,
       color: "text-blue-500 bg-blue-500/10 border-blue-500/20"
     },
     {
       title: "Active Streak",
-      value: "12 Days",
-      subtext: "Mascot mood: Happy! 🦉",
+      value: `${streak} Day${streak !== 1 ? "s" : ""}`,
+      subtext: streak > 5 ? "You're on fire! 🦉🔥" : "Daily streak active",
       trend: "stable",
       icon: Flame,
       color: "text-orange-500 bg-orange-500/10 border-orange-500/20"
     },
     {
       title: "Global Points",
-      value: "8,120",
-      subtext: "Top 5% of developers",
+      value: totalPoints.toLocaleString(),
+      subtext: `Rank points: ${userData?.points?.gitRankPoints || 0} Git + ${userData?.points?.referralPoints || 0} Ref`,
       trend: "up",
       icon: Award,
       color: "text-purple-500 bg-purple-500/10 border-purple-500/20"
@@ -52,7 +84,7 @@ export const StatsCards = () => {
         return (
           <Card
             key={idx}
-            className="flex items-center justify-between p-6 relative overflow-hidden group"
+            className="flex items-center justify-between p-6 relative overflow-hidden group border-slate-200/50 dark:border-slate-800/50 hover:shadow-lg transition-all duration-300"
           >
             {/* Background Accent Gradient Hover */}
             <div className="absolute inset-0 bg-gradient-to-br from-violet-600/0 via-indigo-600/0 to-blue-600/0 group-hover:to-indigo-500/5 dark:group-hover:to-indigo-500/5 transition-all duration-300 pointer-events-none" />
@@ -62,7 +94,7 @@ export const StatsCards = () => {
                 {stat.title}
               </span>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-slate-900 dark:text-white">
+                <span className="text-3xl font-extrabold text-slate-900 dark:text-white leading-none">
                   {stat.value}
                 </span>
                 {stat.trend === "up" && (
@@ -71,7 +103,7 @@ export const StatsCards = () => {
                   </span>
                 )}
               </div>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                 {stat.subtext}
               </p>
             </div>

@@ -1,6 +1,6 @@
 import React from "react";
-import { BookOpen, Flame, Play, Timer, Sparkles, Plus, Check } from "lucide-react";
-import { habitCards, weeklyHeatmap, focusStats } from "../data/streaks";
+import { BookOpen, Timer, Plus, Check } from "lucide-react";
+import { habitCards, weeklyHeatmap } from "../data/streaks";
 import Card from "../components/ui/Card";
 import SectionHeader from "../components/ui/SectionHeader";
 import ComingSoonCard from "../components/ui/ComingSoonCard";

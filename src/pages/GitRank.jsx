@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
-import { Search, Filter, ShieldAlert, Award, Star } from "lucide-react";
+import { Search, Filter, Star } from "lucide-react";
 import { Github } from "../components/ui/Icons";
-import trophyAnimation from "../assets/animations/trophy.json";
+
 import { leaderboardData } from "../data/leaderboard";
 import Card from "../components/ui/Card";
 import SectionHeader from "../components/ui/SectionHeader";

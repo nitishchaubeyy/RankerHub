@@ -1,5 +1,5 @@
 import React from "react";
-import { Flame, Check, HelpCircle } from "lucide-react";
+import { Flame, Check } from "lucide-react";
 import { streakHistory, focusStats } from "../../data/streaks";
 import Card from "../ui/Card";
 

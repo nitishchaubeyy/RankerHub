@@ -1,8 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { LogOut, X, AlertTriangle } from "lucide-react";
+import { LogOut, AlertTriangle } from "lucide-react";
 import GradientButton from "./GradientButton";
-import Card from "./Card";
 
 export const LogoutConfirmModal = ({ onClose, onConfirm }) => {
   return (

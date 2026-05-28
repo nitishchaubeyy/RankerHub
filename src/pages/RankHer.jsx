@@ -1,5 +1,5 @@
 import React from "react";
-import { Sparkles, Trophy, Quote, ArrowRight, Star } from "lucide-react";
+import { Sparkles, Quote, Star } from "lucide-react";
 import { womenLeaderboardData } from "../data/leaderboard";
 import Card from "../components/ui/Card";
 import SectionHeader from "../components/ui/SectionHeader";
@@ -32,7 +32,7 @@ export const RankHer = () => {
 
       {/* Feature / Spotlights: Top Women in Tech Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {womenLeaderboardData.slice(0, 2).map((user, idx) => (
+        {womenLeaderboardData.slice(0, 2).map((user, _idx) => (
           <Card
             key={user.rank}
             className="p-6 relative overflow-hidden flex flex-col md:flex-row items-center gap-6 border-pink-500/15"

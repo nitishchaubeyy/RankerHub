@@ -12,14 +12,16 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  TrendingUp,
   Info,
   HelpCircle,
-  Award
+  Award,
+  UsersRound
 } from "lucide-react";
 import { Github } from "../ui/Icons";
-import { sidebarLinks, systemBadges } from "../../constants";
+import { sidebarLinks } from "../../constants";
 import LogoutConfirmModal from "../ui/LogoutConfirmModal";
+import logo from "../../assets/logo.png";
+import { useAuth } from "../../context/AuthContext";
 
 const iconMap = {
   Home,
@@ -33,10 +35,17 @@ const iconMap = {
   LogOut,
   Info,
   HelpCircle,
-  Award
+  Award,
+  UsersRound
+};
+
+const isLinkActive = (pathname, path) => {
+  if (path === "/dashboard") return pathname === path;
+  return pathname === path || pathname.startsWith(`${path}/`);
 };
 
 export const Sidebar = ({ isCollapsed, toggleCollapse }) => {
+  const { logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -45,9 +54,14 @@ export const Sidebar = ({ isCollapsed, toggleCollapse }) => {
     setShowLogoutConfirm(true);
   };
 
-  const confirmLogout = () => {
+  const confirmLogout = async () => {
     setShowLogoutConfirm(false);
-    navigate("/");
+    try {
+      await logout();
+      navigate("/");
+    } catch (error) {
+      console.error("Logout process error:", error);
+    }
   };
 
   return (
@@ -60,8 +74,8 @@ export const Sidebar = ({ isCollapsed, toggleCollapse }) => {
         {/* Sidebar Header / Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800/50">
           <Link to="/" className="flex items-center gap-2.5 overflow-hidden">
-            <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-blue-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <TrendingUp className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center bg-slate-900 border border-slate-800/50 shadow-md">
+              <img src={logo} alt="RankerHub Logo" className="w-full h-full object-cover" />
             </div>
             <AnimatePresence>
               {!isCollapsed && (
@@ -69,7 +83,7 @@ export const Sidebar = ({ isCollapsed, toggleCollapse }) => {
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
-                  className="font-extrabold text-xl bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-blue-400 tracking-tight"
+                  className="font-montserrat font-extrabold text-xl bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-blue-400 tracking-tight"
                 >
                   RankerHub
                 </motion.span>
@@ -90,7 +104,7 @@ export const Sidebar = ({ isCollapsed, toggleCollapse }) => {
         <div className="flex-1 py-6 px-3 space-y-1.5 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800">
           {sidebarLinks.map((link) => {
             const IconComponent = iconMap[link.icon] || Home;
-            const isActive = location.pathname === link.path;
+            const isActive = isLinkActive(location.pathname, link.path);
 
             return (
               <Link

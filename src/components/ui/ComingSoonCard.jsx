@@ -1,5 +1,5 @@
 import React from "react";
-import { motion } from "framer-motion";
+import {  } from "framer-motion";
 import LottiePlayer from "./LottiePlayer";
 import hourglassAnimation from "../../assets/animations/hourglass_loading.json";
 import Card from "./Card";

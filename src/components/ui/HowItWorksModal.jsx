@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Link2, GitPullRequest, Terminal, Flame, Trophy, X, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Link2, GitPullRequest, Terminal, Flame, Trophy, X, CheckCircle2 } from "lucide-react";
 import Card from "./Card";
 
 export const HowItWorksModal = ({ onClose }) => {

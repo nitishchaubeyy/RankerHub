@@ -6,7 +6,6 @@ import {
   Trophy,
   CheckCircle2,
   Zap,
-  TrendingUp,
   Star,
   Target,
   Sparkles

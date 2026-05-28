@@ -23,8 +23,9 @@ export const ContributorsGrid = ({ fadeInUp, staggerContainer }) => {
         const filtered = data.filter(
           (user) => !excludedUsers.includes(user.login.toLowerCase())
         );
+        const sorted = filtered.sort((a, b) => b.contributions - a.contributions);
         
-        setContributors(filtered);
+        setContributors(sorted);
         setError(null);
       } catch (err) {
         console.error("Error fetching contributors:", err);
@@ -43,11 +44,11 @@ export const ContributorsGrid = ({ fadeInUp, staggerContainer }) => {
         {[...Array(6)].map((_, idx) => (
           <div
             key={idx}
-            className="p-4 rounded-xl border border-slate-200/50 dark:border-slate-800/50 bg-white/20 dark:bg-slate-950/20 animate-pulse flex flex-col items-center space-y-3"
+            className="p-4 rounded-2xl border border-slate-200/50 dark:border-slate-800/50 bg-white/20 dark:bg-slate-950/20 animate-pulse flex flex-col items-center space-y-3"
           >
-            <div className="w-12 h-12 rounded-xl bg-slate-200 dark:bg-slate-800" />
+            <div className="w-14 h-14 rounded-full bg-slate-200 dark:bg-slate-800" />
             <div className="h-3 w-16 bg-slate-200 dark:bg-slate-800 rounded" />
-            <div className="h-3 w-12 bg-slate-200 dark:bg-slate-800 rounded" />
+            <div className="h-3 w-12 bg-slate-200 dark:bg-slate-800 rounded-full" />
           </div>
         ))}
       </div>
@@ -91,7 +92,7 @@ export const ContributorsGrid = ({ fadeInUp, staggerContainer }) => {
       viewport={{ once: true }}
       className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-4"
     >
-      {contributors.map((contrib) => (
+      {contributors.map((contrib, idx) => (
         <ContributorCard
           key={contrib.id}
           login={contrib.login}
@@ -99,6 +100,7 @@ export const ContributorsGrid = ({ fadeInUp, staggerContainer }) => {
           contributions={contrib.contributions}
           htmlUrl={contrib.html_url}
           variants={fadeInUp}
+          rank={idx + 1}
         />
       ))}
     </motion.div>

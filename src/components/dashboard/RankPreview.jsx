@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Trophy, ChevronRight, Award } from "lucide-react";
+import { Trophy, ChevronRight } from "lucide-react";
 import { leaderboardData } from "../../data/leaderboard";
 import Card from "../ui/Card";
 
