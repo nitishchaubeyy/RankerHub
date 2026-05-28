@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Request Reviewer and Assignee
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const prAuthor = context.payload.pull_request.user.login;
