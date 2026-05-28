@@ -33,7 +33,7 @@ jobs:
         run: npx prettier --check "src/**/*.{js,jsx,ts,tsx,css,json,md}" || true
 
       - name: Markdown Lint
-        run: npx markdownlint-cli2 "**/*.md"
+        run: npx markdownlint-cli2 "**/*.md" "#node_modules" "#.agents"
 
       - name: Spell Check
         run: npx cspell lint "src/**/*.{js,jsx,ts,tsx,css,md}" --no-progress || true
