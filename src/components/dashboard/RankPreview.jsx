@@ -114,7 +114,7 @@ export const RankPreview = () => {
                   {user.points?.totalPoints?.toLocaleString() || 0}
                 </span>
                 <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-orange-500 dark:text-orange-400">
-                  🔥 {user.streak || 1}d streak
+                  🔥 {user.streak ?? 0}d streak
                 </span>
               </div>
             </div>

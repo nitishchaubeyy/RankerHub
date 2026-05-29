@@ -851,7 +851,7 @@ export const GitRank = () => {
 
                       {/* Streak flame cell */}
                       <td className="py-4 px-4 text-center font-bold text-orange-600 dark:text-orange-400 whitespace-nowrap">
-                        🔥 {u.streak || 1} days
+                        🔥 {u.streak ?? 0} days
                       </td>
 
                       {/* Commits count cell */}
