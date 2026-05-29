@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import Toast from "../components/ui/Toast";
 import LottiePlayer from "../components/ui/LottiePlayer";
 import {
   MapPin,
@@ -27,7 +26,7 @@ export const Profile = () => {
   const { userData, user, setUserData } = useAuth();
   const [copied, setCopied] = useState(false);
   const [rank, setRank] = useState("Loading...");
-  const [toast, setToast] = useState(null);
+
   // Social links edit states
   const [editingSocial, setEditingSocial] = useState(null);
   const [editValue, setEditValue] = useState("");
