@@ -23,9 +23,10 @@ service cloud.firestore {
       // Leaderboard requires anyone logged in to view profiles
       allow read: if isAuthenticated();
 
-      // Creation: A logged in user can provision a skeletal profile or onboarding document
-      allow create: if isOwner(uid) 
-        && request.resource.data.city == "Mumbai"
+      // Creation: A logged in user can provision a skeletal profile or onboarding document.
+      // The city field is not restricted to any specific value so users from all cities
+      // can create their profile during onboarding.
+      allow create: if isOwner(uid)
         && (request.resource.data.onboardingStatus == "incomplete" || request.resource.data.onboardingStatus == "complete");
 
       // RULE 1: Allow social profile updates (LinkedIn, Instagram, Discord) ANYTIME
