@@ -5,23 +5,23 @@ import { useTheme } from "../../hooks/useTheme";
 import { Menu, X } from "lucide-react";
 import logo from "../../assets/logo.png";
 
+const getInitialIndex = (location) => {
+  const path = location.pathname;
+  const hash = location.hash;
+  const search = location.search;
+
+  if (search.includes("modal=how-it-works")) return 2;
+  if (hash === "#features") return 1;
+  if (path === "/about") return 3;
+  return 0; // Default to Home
+};
+
 export const PublicNavbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toggleTheme } = useTheme();
 
-  const getInitialIndex = () => {
-    const path = location.pathname;
-    const hash = location.hash;
-    const search = location.search;
-
-    if (search.includes("modal=how-it-works")) return 2;
-    if (hash === "#features") return 1;
-    if (path === "/about") return 3;
-    return 0; // Default to Home
-  };
-
-  const [activeIndex, setActiveIndex] = useState(getInitialIndex());
+  const activeIndex = getInitialIndex(location);
   const [mobileExpanded, setMobileExpanded] = useState(false);
 
   const buttonRefs = useRef([]);
@@ -45,11 +45,6 @@ export const PublicNavbar = () => {
     activePill.style.width = `${btn.offsetWidth}px`;
     activePill.style.transform = `translateX(${btn.offsetLeft}px)`;
   };
-
-  // Sync activeIndex with location changes
-  useEffect(() => {
-    setActiveIndex(getInitialIndex());
-  }, [location]);
 
   // Recalculate pill on activeIndex change
   useEffect(() => {
@@ -95,7 +90,6 @@ export const PublicNavbar = () => {
   };
 
   const handleNavClick = (index, item) => {
-    setActiveIndex(index);
     setMobileExpanded(false);
 
     if (item.hash) {
