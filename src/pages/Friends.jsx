@@ -41,11 +41,6 @@ export const Friends = () => {
         // Remove the current logged-in user from the list
         const filteredDevs = fetchedDevs.filter(dev => dev.id !== currentUser?.uid);
         setDevelopers(filteredDevs);
-        
-        // Mock a couple of followers for UI testing (remove once #105 backend logic is done)
-        if (filteredDevs.length > 2) {
-          setFollowerIds([filteredDevs[0].id, filteredDevs[1].id]);
-        }
       } catch (error) {
         console.error("Failed to load developers", error);
       } finally {
