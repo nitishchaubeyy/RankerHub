@@ -15,8 +15,8 @@ export const fetchDevelopers = async () => {
         role: data.role || "Developer",
         bio: data.bio || "Building awesome projects on RankerHub.",
         tags: data.skills || ["Developer"],
-        mutualFriends: Math.floor(Math.random() * 10), 
-        online: Math.random() > 0.5, 
+        mutualFriends: 0,
+        online: false,
         activity: "Recently joined RankerHub"
       };
     });
