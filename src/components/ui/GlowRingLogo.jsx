@@ -45,12 +45,15 @@ export const GlowRingLogo = ({ logoSrc, type = "logo", className = "" }) => {
   }, []);
 
   return (
-    <div className={`metallic-ring-container ${className}`}>
-      {/* Container for the liquid metal shader canvas */}
-      <div ref={containerRef} className="absolute inset-0 w-full h-full z-[-2] rounded-full overflow-hidden" />
+    <div className={`metallic-ring-container group relative ${className}`}>
+      {/* Container for the liquid metal shader canvas (rotates randomly on hover) */}
+      <div 
+        ref={containerRef} 
+        className="shader-canvas-wrapper absolute inset-0 w-full h-full z-10 rounded-full overflow-hidden transition-all duration-500 opacity-0 group-hover:opacity-100 pointer-events-none" 
+      />
       
       {/* Dark metallic backing disc */}
-      <div className="metallic-inner-disc">
+      <div className="metallic-inner-disc z-20">
         {type === "home" ? (
           // SVG Home Icon styled to look metallic
           <svg
@@ -80,7 +83,7 @@ export const GlowRingLogo = ({ logoSrc, type = "logo", className = "" }) => {
       </div>
       
       {/* Outer border highlighting */}
-      <div className="metallic-outer-border" />
+      <div className="metallic-outer-border z-30" />
     </div>
   );
 };
