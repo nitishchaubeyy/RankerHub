@@ -1,10 +1,12 @@
-import { collection, getDocs, doc, setDoc, deleteDoc, onSnapshot, query, where } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, deleteDoc, onSnapshot, query, where, limit } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
-// Asynchronously fetch real users from Firebase
+// Asynchronously fetch real users from Firebase (capped at 50 to avoid
+// downloading the entire collection on every page load)
 export const fetchDevelopers = async () => {
   try {
-    const querySnapshot = await getDocs(collection(db, "users"));
+    const q = query(collection(db, "users"), limit(50));
+    const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => {
       const data = doc.data();
       return {
