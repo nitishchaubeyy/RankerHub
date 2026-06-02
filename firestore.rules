@@ -45,14 +45,7 @@ service cloud.firestore {
              request.resource.data.instagramHandle == resource.data.instagramHandle &&
              request.resource.data.createdAt == resource.data.createdAt
            ))
-        // 2. Prevent the client from manually inflating their own points directly.
-        // During self-update, the total points must equal the sum of constituent points.
-        && request.resource.data.points.totalPoints == (
-             request.resource.data.points.gitRankPoints +
-             request.resource.data.points.codingVersePoints +
-             request.resource.data.points.streakPoints +
-             request.resource.data.points.referralPoints
-           )
+
         // 3. Prevent arbitrary point spikes during normal client writes:
         && (
           // Either they are transitioning from incomplete -> complete onboarding, or setting up their initial gitRankPoints

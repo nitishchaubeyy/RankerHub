@@ -22,12 +22,10 @@ export const AuthProvider = ({ children }) => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isOnboarding, setIsOnboarding] = useState(false);
-  // GitHub OAuth access token kept in React state only -- never written to
-  // sessionStorage or localStorage. Storing it in Web Storage exposes it to
-  // any JavaScript running on the page (XSS). Keeping it in memory means it
-  // is lost on page refresh, but the token is only needed once after login
-  // to call fetchGitHubStats, so this trade-off is acceptable.
-  const [ghAccessToken, setGhAccessToken] = useState(null);
+  // GitHub OAuth access token persisted in sessionStorage to survive page refreshes
+  const [ghAccessToken, setGhAccessToken] = useState(() => {
+    return sessionStorage.getItem("gh_access_token") || null;
+  });
 
   // Listen to Auth State Changed
   useEffect(() => {
@@ -42,6 +40,10 @@ export const AuthProvider = ({ children }) => {
 
       if (currentUser) {
         setUser(currentUser);
+        const token = sessionStorage.getItem(`gh_token_${currentUser.uid}`) || sessionStorage.getItem("gh_access_token");
+        if (token) {
+          setGhAccessToken(token);
+        }
         
         // Listen in real-time to the user document in Firestore
         const userDocRef = doc(db, "users", currentUser.uid);
@@ -90,7 +92,9 @@ export const AuthProvider = ({ children }) => {
       const githubId = additionalInfo?.profile?.id || null;
       const avatar = additionalInfo?.profile?.avatar_url || authUser.photoURL || "";
 
-      // Keep the token in React state only -- do not write to Web Storage.
+      // Save the token to sessionStorage and state to keep user authenticated across refreshes
+      sessionStorage.setItem("gh_access_token", accessToken);
+      sessionStorage.setItem(`gh_token_${authUser.uid}`, accessToken);
       setGhAccessToken(accessToken);
 
       const userDocRef = doc(db, "users", authUser.uid);
@@ -138,6 +142,10 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     setLoading(true);
     try {
+      if (user) {
+        sessionStorage.removeItem(`gh_token_${user.uid}`);
+      }
+      sessionStorage.removeItem("gh_access_token");
       await signOutUser();
       setUser(null);
       setUserData(null);
