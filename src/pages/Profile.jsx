@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { AnimatePresence } from "framer-motion";
 import LottiePlayer from "../components/ui/LottiePlayer";
 import {
@@ -11,7 +11,7 @@ import {
   X,
   Save,
   Plus,
-  Activity 
+  Activity
 } from "lucide-react";
 import { Github, Linkedin, Instagram } from "../components/ui/Icons";
 import { query, collection, where, getCountFromServer, doc, updateDoc, getDoc } from "firebase/firestore";
@@ -26,23 +26,27 @@ import GradientButton from "../components/ui/GradientButton";
 import Toast from "../components/ui/Toast";
 
 export const Profile = () => {
-  const { userData, user, setUserData, login } = useAuth();
+  const { userData, user, setUserData, syncGitHubData } = useAuth();
   const [copied, setCopied] = useState(false);
   const [rank, setRank] = useState("Loading...");
   const [toast, setToast] = useState(null);
-  // Social links edit states
   const [editingSocial, setEditingSocial] = useState(null);
   const [editValue, setEditValue] = useState("");
   const [updating, setUpdating] = useState(false);
   
-  // Local state for social links - initialize with userData directly
   const [localSocialLinks, setLocalSocialLinks] = useState({
     linkedinUrl: userData?.linkedinUrl || null,
     instagramHandle: userData?.instagramHandle || null,
     discordUsername: userData?.discordUsername || null
   });
 
-  // Update local social links when userData changes from Firestore
+  useEffect(() => {
+    if (user && userData?.githubUsername) {
+      syncGitHubData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]); 
+
   useEffect(() => {
     if (userData) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -55,7 +59,6 @@ export const Profile = () => {
     }
   }, [userData]);
 
-  // Optimized rank count query
   useEffect(() => {
     if (!userData || !userData.points) return;
 
@@ -98,7 +101,6 @@ export const Profile = () => {
     return `https://discord.com/users/${encodeURIComponent(userId)}`;
   };
 
-  // Handle social link update
   const handleUpdateSocialLink = async (type, value) => {
     if (!user) return;
     
@@ -129,22 +131,18 @@ export const Profile = () => {
         updateData.discordUsername = processedValue;
       }
       
-      // Add updated timestamp
       updateData.updatedAt = new Date().toISOString();
       
       await updateDoc(userRef, updateData);
       
-      // Fetch updated user data
       const updatedUserDoc = await getDoc(userRef);
       const updatedData = updatedUserDoc.exists() ? updatedUserDoc.data() : null;
       
-      // Update local state
       setLocalSocialLinks(prev => ({
         ...prev,
         [type === "linkedin" ? "linkedinUrl" : type === "instagram" ? "instagramHandle" : "discordUsername"]: processedValue
       }));
       
-      // Update AuthContext if available
       if (setUserData && updatedData) {
         setUserData(prev => ({
           ...prev,
@@ -164,14 +162,12 @@ export const Profile = () => {
     }
   };
 
-  // Handle Private Repository Sync Toggle
   const handlePrivateSyncToggle = async () => {
     if (!user) return;
     try {
       const isEnabling = !userData?.privateRepoSyncEnabled;
       const userRef = doc(db, "users", user.uid);
       
-
       await updateDoc(userRef, { privateRepoSyncEnabled: isEnabling });
       
       if (setUserData) {
@@ -202,32 +198,27 @@ export const Profile = () => {
   ];
   const earnedPointsTotal = pointsEngines.reduce((sum, engine) => sum + Math.max(engine.value, 0), 0);
 
-  // HEATMAP GENERATOR (Mock Data based on real streak)
-  const generateHeatmapData = () => {
+  const heatmap = useMemo(() => {
     const weeks = 16;
     const daysPerWeek = 7;
     const data = [];
     
-    // Seed random based on user streak to make it consistent for the user
     const seed = streak || 1;
     let activityTotal = 0;
 
     for (let w = 0; w < weeks; w++) {
       const weekData = [];
       for (let d = 0; d < daysPerWeek; d++) {
-        // Calculate days ago (0 is today, 111 is 16 weeks ago)
         const daysAgo = ((weeks - 1 - w) * daysPerWeek) + (daysPerWeek - 1 - d);
+        let intensity; 
         
-        let intensity = 0; // 0: none, 1: low, 2: medium, 3: high, 4: max
-        
-        // Ensure recent days are lit up if there is a streak
         if (daysAgo < streak) {
-           intensity = Math.floor(Math.random() * 3) + 2; // 2 to 4
+           intensity = (daysAgo % 3) + 2; 
         } else if (daysAgo > 111) {
            intensity = 0; 
         } else {
-           const random = Math.sin(daysAgo * seed) * 10000;
-           const normalized = random - Math.floor(random);
+           const pseudoRandom = Math.abs(Math.sin(daysAgo * seed) * 10000);
+           const normalized = pseudoRandom - Math.floor(pseudoRandom);
            if (normalized > 0.8) intensity = 4;
            else if (normalized > 0.6) intensity = 3;
            else if (normalized > 0.4) intensity = 2;
@@ -242,11 +233,8 @@ export const Profile = () => {
     }
     
     return { grid: data, total: activityTotal * 3 }; 
-  };
+  }, [streak]);
 
-  const heatmap = generateHeatmapData();
-
-  // Color mapping based on intensity
   const getIntensityColor = (intensity) => {
     switch(intensity) {
       case 4: return "bg-violet-600 dark:bg-violet-500";
@@ -257,7 +245,6 @@ export const Profile = () => {
     }
   };
 
-  // Discord icon component
   const DiscordIcon = ({ className }) => (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
       <path d="M20.317 4.3698a19.7913 19.7913 0 0 0-4.8851-1.5152.0741.0741 0 0 0-.0785.0371c-.21.3753-.444.8643-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.163-.3852-.4058-.8742-.6177-1.2495a.077.077 0 0 0-.0785-.037 19.7363 19.7363 0 0 0-4.8852 1.515.0699.0699 0 0 0-.0321.0277C2.5092 7.7761 1.862 11.0615 2.183 14.3025a.074.074 0 0 0 .0283.0479 19.9411 19.9411 0 0 0 6.0017 2.9829.0766.0766 0 0 0 .0791-.022c.4616-.6257.8731-1.2855 1.231-1.9798a.0745.0745 0 0 0-.041-.105c-.6486-.2477-1.2671-.5545-1.8551-.9069a.074.074 0 0 1-.025-.0968.074.074 0 0 1 .0959-.0291c.123.0769.2437.1567.3616.2393a12.5958 12.5958 0 0 0 7.6554 0c.1179-.0826.2387-.1624.3616-.2393a.074.074 0 0 1 .096.0288.074.074 0 0 1-.025.097c-.588.3524-1.2065.6592-1.8551.9069a.0745.0745 0 0 0-.041.105c.3579.6943.7694 1.3541 1.231 1.9798a.076.076 0 0 0 .0791.022 19.94 19.94 0 0 0 6.0017-2.9829.074.074 0 0 0 .0283-.0479c.379-3.7757-.607-7.0224-2.538-10.0367a.069.069 0 0 0-.032-.0278zM8.4966 12.5148c-1.182 0-2.148-1.0903-2.148-2.427s.955-2.427 2.148-2.427c1.192 0 2.158 1.0903 2.148 2.427 0 1.3367-.956 2.427-2.148 2.427zm6.999 0c-1.182 0-2.148-1.0903-2.148-2.427s.955-2.427 2.148-2.427c1.192 0 2.158 1.0903 2.148 2.427 0 1.3367-.956 2.427-2.148 2.427z"/>
@@ -271,7 +258,6 @@ export const Profile = () => {
     { label: "Invites Shared", value: `${Math.floor(referralPoints / 100)} Used`, detail: "Referral code successes" }
   ];
 
-  // Social links configuration with live data from localSocialLinks
   const socialLinks = [
     {
       id: "github",
@@ -304,7 +290,7 @@ export const Profile = () => {
       value: localSocialLinks.linkedinUrl,
       color: "hover:bg-indigo-500/10 hover:text-indigo-600",
       textColor: "text-slate-500",
-      placeholder: "LinkedIn URL or profile ID (e.g., linkedin.com/in/username)",
+      placeholder: "LinkedIn URL or profile ID",
       type: "url"
     },
     {
@@ -316,7 +302,7 @@ export const Profile = () => {
       value: localSocialLinks.instagramHandle,
       color: "hover:bg-pink-500/10 hover:text-pink-500",
       textColor: "text-slate-500",
-      placeholder: "@username or username (without @)",
+      placeholder: "@username or username",
       type: "username"
     },
     {
@@ -328,12 +314,11 @@ export const Profile = () => {
       value: localSocialLinks.discordUsername,
       color: "hover:bg-indigo-500/10 hover:text-indigo-600",
       textColor: "text-slate-500",
-      placeholder: "Discord user ID or profile URL",
+      placeholder: "Discord user ID",
       type: "username"
     }
   ];
 
-  // Render social link button
   const renderSocialButton = (social) => {
     const isEditing = editingSocial === social.id;
     const hasData = social.hasLink;
@@ -375,7 +360,6 @@ export const Profile = () => {
       );
     }
 
-    // For GitHub and Email - always show as clickable logos
     if (social.id === "github" || social.id === "email") {
       return (
         <a
@@ -391,7 +375,6 @@ export const Profile = () => {
       );
     }
 
-    // For other socials - show logo if has data, otherwise show add button
     if (hasData) {
       return (
         <div className="relative group">
@@ -415,7 +398,6 @@ export const Profile = () => {
               <span className="text-xs font-medium hidden sm:inline">{social.name}</span>
             </div>
           )}
-          {/* Edit button on hover for existing links */}
           <button
             onClick={() => {
               setEditingSocial(social.id);
@@ -430,7 +412,6 @@ export const Profile = () => {
       );
     }
 
-    // Show add button for missing socials
     return (
       <button
         onClick={() => {
@@ -447,7 +428,6 @@ export const Profile = () => {
 
   return (
     <div className="space-y-8">
-      {/* Page Header */}
       <SectionHeader
         title="Developer Profile"
         subtitle="Manage your public links, view achievements, and review earned badges."
@@ -459,13 +439,9 @@ export const Profile = () => {
         </GradientButton>
       </SectionHeader>
 
-      {/* Hero Profile Details Card */}
       <Card className="p-8 relative overflow-hidden flex flex-col md:flex-row items-center gap-8 border-slate-200/50 dark:border-slate-800/50">
-        
-        {/* Glow backdrop */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/5 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Profile Avatar Frame with Active Badge indicator */}
         <div className="relative w-32 h-32 flex-shrink-0">
           <div className="w-full h-full rounded-2xl overflow-hidden ring-4 ring-violet-500/20 shadow-xl">
             <img
@@ -474,13 +450,11 @@ export const Profile = () => {
               className="w-full h-full object-cover"
             />
           </div>
-          {/* Active status bubble */}
           <span className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 border-2 border-white dark:border-slate-900 flex items-center justify-center text-xs text-white shadow-md animate-pulse">
             🔥
           </span>
         </div>
 
-        {/* Bio information */}
         <div className="flex-1 space-y-4 text-center md:text-left">
           <div className="space-y-1.5">
             <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
@@ -510,7 +484,6 @@ export const Profile = () => {
             </span>
           </div>
 
-          {/* Social Links Section */}
           <div className="flex justify-center md:justify-start items-center gap-3 pt-2 flex-wrap">
             {socialLinks.map((social) => (
               <div key={social.id}>
@@ -529,10 +502,8 @@ export const Profile = () => {
               )}
             </AnimatePresence>
         </div>
-
       </Card>
 
-      {/* PRIVATE REPO SYNC CARD  */}
       <Card className="mb-6 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-slate-200/50 dark:border-slate-800/50">
         <div>
           <h3 className="font-extrabold text-lg text-slate-900 dark:text-white my-0 flex items-center gap-2">
@@ -560,7 +531,6 @@ export const Profile = () => {
         </button>
       </Card>
 
-      {/* Grid: Statistics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {profileStats.map((stat, idx) => (
           <Card key={idx} className="p-5 text-center flex flex-col items-center justify-center border-slate-200/50 dark:border-slate-800/50">
@@ -577,7 +547,6 @@ export const Profile = () => {
         ))}
       </div>
 
-      {/*  COMBINED CONTRIBUTION HEATMAP  */}
       <Card className="p-6 border-slate-200/50 dark:border-slate-800/50 overflow-x-auto">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800 min-w-max">
           <div>
@@ -600,14 +569,12 @@ export const Profile = () => {
 
         <div className="mt-6 flex flex-col items-start min-w-max">
           <div className="flex gap-1">
-            {/* Y-Axis Days Label */}
             <div className="flex flex-col gap-1 pr-2 pt-5 text-[9px] font-bold text-slate-400 h-full justify-between">
               <span className="h-3 leading-3">Mon</span>
               <span className="h-3 leading-3">Wed</span>
               <span className="h-3 leading-3">Fri</span>
             </div>
 
-            {/* Heatmap Grid */}
             <div className="flex gap-1">
               {heatmap.grid.map((week, wIdx) => (
                 <div key={wIdx} className="flex flex-col gap-1">
@@ -623,7 +590,6 @@ export const Profile = () => {
             </div>
           </div>
 
-          {/* Legend */}
           <div className="mt-4 flex items-center justify-end w-full gap-2 text-[10px] font-bold text-slate-400">
             <span>Less</span>
             <div className="flex gap-1">
@@ -638,11 +604,8 @@ export const Profile = () => {
         </div>
       </Card>
 
-
-      {/* Grid: Verified GitHub Audit Snapshot & Points Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
-        {/* GitHub Audit Snapshot */}
         <Card className="p-6 flex flex-col justify-between border-slate-200/50 dark:border-slate-800/50">
           <div className="pb-4 border-b border-slate-100 dark:border-slate-800">
             <h3 className="font-extrabold text-lg text-slate-900 dark:text-white my-0">GitHub Audit Snapshot</h3>
@@ -694,7 +657,6 @@ export const Profile = () => {
           </div>
         </Card>
 
-        {/* Detailed Points breakdown */}
         <Card className="p-6 flex flex-col justify-between border-slate-200/50 dark:border-slate-800/50">
           <div className="pb-4 border-b border-slate-100 dark:border-slate-800">
             <h3 className="font-extrabold text-lg text-slate-900 dark:text-white my-0">Points Engine Breakdown</h3>
@@ -756,10 +718,8 @@ export const Profile = () => {
 
       </div>
 
-      {/* Grid: Badges (Trophy Case) & Lotties */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Badges Box (Takes 2 cols) */}
         <Card className="lg:col-span-2 flex flex-col justify-between border-slate-200/50 dark:border-slate-800/50">
           <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
             <div>
@@ -773,7 +733,6 @@ export const Profile = () => {
             <Award className="w-5 h-5 text-violet-500" />
           </div>
 
-          {/* Badges List */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 my-6">
             {systemBadges.map((badge) => {
               let unlocked = false;
@@ -821,7 +780,6 @@ export const Profile = () => {
           </div>
         </Card>
 
-        {/* Global Trophy card */}
         <Card className="flex flex-col items-center justify-center p-8 text-center relative overflow-hidden bg-gradient-to-br from-violet-600/10 to-indigo-600/10 border-violet-500/15">
           <div className="w-40 h-40 flex items-center justify-center mb-4">
             <LottiePlayer animationData={trophyAnimation} loop={true} className="w-full h-full" />
