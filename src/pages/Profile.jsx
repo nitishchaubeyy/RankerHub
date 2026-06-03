@@ -260,13 +260,27 @@ export const Profile = () => {
 
   const handleUpdateSocialLink = async (type, value) => {
     if (!user) return;
-    
+
     setUpdating(true);
     try {
       const userRef = doc(db, "users", user.uid);
+
+      // Verify ownership: fetch the user document and confirm the
+      // authenticated user owns it before allowing any updates.
+      const userDocSnap = await getDoc(userRef);
+      if (!userDocSnap.exists()) {
+        setToast({ message: "Profile not found. Please try again.", type: "error" });
+        return;
+      }
+
+      if (userDocSnap.data().uid !== user.uid) {
+        setToast({ message: "Unauthorized: You can only update your own profile.", type: "error" });
+        return;
+      }
+
       const updateData = {};
       let processedValue = null;
-      
+
       if (type === "linkedin") {
         if (value && value.trim()) {
           let linkedinUrl = value.trim();
@@ -287,9 +301,9 @@ export const Profile = () => {
         }
         updateData.discordUsername = processedValue;
       }
-      
+
       updateData.updatedAt = new Date().toISOString();
-      
+
       // Use Atomic Batch Write instead of updateDoc
       const batch = writeBatch(db);
       batch.update(userRef, updateData);
