@@ -19,7 +19,12 @@ import {
   Target,
   Trophy,
   UserPlus,
-  Gift
+  Gift,
+  Link2,
+  GitPullRequest,
+  Terminal,
+  Flame,
+  CheckCircle2
 } from "lucide-react";
 import { Github } from "../components/ui/Icons";
 import { fadeUp, staggerContainer } from "../utils/motion";
@@ -185,6 +190,44 @@ export const Home = () => {
     { label: "Global Badges Issued", numericValue: 24000, suffix: "+", decimals: 0, icon: Award }
   ];
 
+  const steps = [
+    {
+      num: "01",
+      title: "Connect Your Profile",
+      desc: "Link your GitHub account or developer credentials securely in seconds. RankerHub parses public contribution events, repositories, and active timelines. We prioritize security and privacy: our engine operates on public logs and never requests write scopes or access to private source code.",
+      icon: Link2,
+      color: "from-blue-600 to-cyan-500 text-blue-400"
+    },
+    {
+      num: "02",
+      title: "Track Live Coding Metrics",
+      desc: "Our synchronization engine audits your active development metrics dynamically. We track active coding frequencies, pull requests created, code review suggestions submitted, and lines of code committed to assign your real-time global developer score.",
+      icon: GitPullRequest,
+      color: "from-violet-600 to-indigo-500 text-violet-400"
+    },
+    {
+      num: "03",
+      title: "Conquer CodingVerse Arenas",
+      desc: "Step into the interactive CodingVerse arena to solve daily algorithmic challenges across arrays, pointers, stacks, and graph traversals. Compile your code and earn problem-solving XP (Experience Points) to boost your global standing.",
+      icon: Terminal,
+      color: "from-purple-600 to-pink-500 text-purple-400"
+    },
+    {
+      num: "04",
+      title: "Build Streaks in CodingOwl",
+      desc: "Stay dedicated and build habit consistency with our mascot, Oliver the Owl. Track consecutive active days, activate timed study/focus sessions, and avoid streak freezes to maintain point multipliers.",
+      icon: Flame,
+      color: "from-orange-600 to-red-500 text-orange-400"
+    },
+    {
+      num: "05",
+      title: "Climb Leaderboards & Mint Badges",
+      desc: "Compare your ratings globally, locally, or in specialized tracks like RankHer. Unlock verified developer badges and showcase your achievements. Soon, badges builds will be minted as Polygon blockchain tokens for profile verification.",
+      icon: Trophy,
+      color: "from-amber-600 to-yellow-500 text-amber-400"
+    }
+  ];
+
   return (
     <div className="relative w-full overflow-hidden">
       <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blob-purple-strong pointer-events-none -z-10 animate-pulse-slow" />
@@ -192,7 +235,7 @@ export const Home = () => {
 
       <section className="relative min-h-screen w-full py-20 md:py-28 overflow-hidden flex items-center">
         <video
-          className="absolute top-0 left-0 w-full h-[90%] object-cover opacity-50 pointer-events-none"
+          className="absolute top-0 left-0 w-full h-full object-cover opacity-50 pointer-events-none"
           src="/banner.mp4"
           autoPlay
           loop
@@ -201,7 +244,7 @@ export const Home = () => {
           preload="metadata"
         />
 
-        <div className="absolute top-0 left-0 w-full h-[90%] bg-white/60 dark:bg-black/60 pointer-events-none" />
+        <div className="absolute top-0 left-0 w-full h-full bg-white/60 dark:bg-black/60 pointer-events-none" />
 
         <div className="relative z-10 w-full px-6">
           <motion.div
@@ -386,6 +429,64 @@ export const Home = () => {
               );
             })}
           </Swiper>
+        </div>
+      </section>
+
+      {/* Embedded How It Works Section */}
+      <section id="how-it-works" className="py-20 border-t border-slate-200/50 dark:border-slate-800/50 bg-slate-50/30 dark:bg-slate-950/20">
+        <div className="max-w-6xl mx-auto px-6">
+          
+          {/* Header */}
+          <div className="max-w-2xl space-y-3 mb-16">
+            <span className="inline-flex w-fit items-center rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-violet-600 dark:text-violet-300">
+              Platform Lifecycle
+            </span>
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white my-0">
+              How RankerHub Works
+            </h2>
+            <p className="text-sm md:text-base text-slate-500 dark:text-slate-400 font-medium leading-7">
+              Follow these steps to synchronize your metrics, conquer challenges, and unlock verified achievements.
+            </p>
+          </div>
+
+          {/* Timeline Layout */}
+          <div className="relative border-l-2 border-slate-200/60 dark:border-slate-800/60 ml-4 md:ml-8 pl-8 md:pl-12 space-y-12 max-w-4xl">
+            {steps.map((step, idx) => {
+              const Icon = step.icon;
+              return (
+                <div key={idx} className="relative group">
+                  {/* Icon wrapper */}
+                  <div className={`absolute -left-[54px] md:-left-[62px] top-0 w-11 h-11 md:w-13 md:h-13 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                    <Icon className="w-5 h-5 text-white" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] font-black text-violet-600 dark:text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded border border-violet-500/20 tracking-wider">
+                        STEP {step.num}
+                      </span>
+                      <h3 className="text-lg md:text-xl font-extrabold text-slate-900 dark:text-white my-0 leading-tight">
+                        {step.title}
+                      </h3>
+                    </div>
+                    
+                    <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-semibold max-w-3xl my-0">
+                      {step.desc}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Bottom Call to Action */}
+          <div className="mt-16 max-w-3xl ml-4 md:ml-8 p-6 rounded-3xl bg-gradient-to-r from-violet-600/10 to-indigo-600/10 border border-violet-500/20 backdrop-blur-md">
+            <p className="text-sm text-violet-600 dark:text-violet-300 font-extrabold my-0 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-violet-600 dark:text-violet-400 flex-shrink-0" />
+              Ready to climb? Link your profile, start coding, and watch your developer standings rise!
+            </p>
+          </div>
+
         </div>
       </section>
     </div>

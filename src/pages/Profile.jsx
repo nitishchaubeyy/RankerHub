@@ -569,10 +569,10 @@ export const Profile = () => {
 
         <div className="mt-6 flex flex-col items-start min-w-max">
           <div className="flex gap-1">
-            <div className="flex flex-col gap-1 pr-2 pt-5 text-[9px] font-bold text-slate-400 h-full justify-between">
-              <span className="h-3 leading-3">Mon</span>
-              <span className="h-3 leading-3">Wed</span>
-              <span className="h-3 leading-3">Fri</span>
+            <div className="grid grid-rows-7 gap-1 pr-2 text-[9px] font-bold text-slate-400">
+              <span className="row-start-2 h-3 sm:h-4 flex items-center justify-end">Mon</span>
+              <span className="row-start-4 h-3 sm:h-4 flex items-center justify-end">Wed</span>
+              <span className="row-start-6 h-3 sm:h-4 flex items-center justify-end">Fri</span>
             </div>
 
             <div className="flex gap-1">

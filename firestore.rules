@@ -20,8 +20,8 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      // Leaderboard requires anyone logged in to view profiles
-      allow read: if isAuthenticated();
+      // Leaderboard requires public access to view user standings
+      allow read: if true;
 
       // Creation: A logged in user can provision a skeletal profile or onboarding document.
       // The city field is not restricted to any specific value so users from all cities
@@ -107,6 +107,12 @@ service cloud.firestore {
       );
     }
     
+    match /follows/{followId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.followerId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.followerId == request.auth.uid;
+    }
+
     // Global lock for other collections
     match /{document=**} {
       allow read, write: if false;
