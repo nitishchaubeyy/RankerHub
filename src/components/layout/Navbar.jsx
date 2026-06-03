@@ -143,9 +143,14 @@ export const Navbar = ({ toggleMobile, isMobileOpen }) => {
                     {searchQuery.trim() && (
                       <button
                         type="button"
+                        // ✅ Yeh daalo:
                         onClick={() => {
-                          handleSearchSubmit(new Event('submit'));
-                          setIsMobileSearchOpen(false);
+                          if (searchQuery.trim()) {
+                            navigate(`/gitrank?search=${encodeURIComponent(searchQuery)}`);
+                            setSearchQuery("");
+                            setIsMobileSearchOpen(false);
+                            setShowSearchResults(false);
+                          }
                         }}
                         className="w-full px-4 py-3 text-sm text-violet-600 dark:text-violet-400 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold transition-colors border-t border-slate-100 dark:border-slate-800"
                       >
