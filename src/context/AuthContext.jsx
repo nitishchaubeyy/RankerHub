@@ -9,7 +9,7 @@ import {
   getDoc,
   setDoc,
   onSnapshot,
-  runTransaction
+  writeBatch
 } from "firebase/firestore";
 import axios from "axios";
 import { auth, db, signInWithGitHub, signOutUser } from "../lib/firebase";
@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }) => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isOnboarding, setIsOnboarding] = useState(false);
-// GitHub OAuth access token persisted in sessionStorage to survive page refreshes
+  // GitHub OAuth access token persisted in sessionStorage to survive page refreshes
   const [ghAccessToken, setGhAccessToken] = useState(() => {
     return sessionStorage.getItem("gh_access_token") || null;
   });
@@ -86,16 +86,21 @@ export const AuthProvider = ({ children }) => {
       const githubId = additionalInfo?.profile?.id || null;
       const avatar = additionalInfo?.profile?.avatar_url || authUser.photoURL || "";
 
-// Save the token to sessionStorage and state to keep user authenticated across refreshes
+      // Save the token to sessionStorage and state to keep user authenticated across refreshes
       sessionStorage.setItem("gh_access_token", accessToken);
       sessionStorage.setItem(`gh_token_${authUser.uid}`, accessToken);
-      setGhAccessToken(accessToken);
       setGhAccessToken(accessToken);
 
       const userDocRef = doc(db, "users", authUser.uid);
       const docSnap = await getDoc(userDocRef);
 
+      // Issue #191: Strict Timezone-Agnostic UTC Streak Calculation
+      const today = new Date();
+      const todayUTCStr = today.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+      const todayUTC = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+
       if (!docSnap.exists()) {
+        // First login ever
         const skeletalUser = {
           uid: authUser.uid,
           githubUsername,
@@ -106,21 +111,57 @@ export const AuthProvider = ({ children }) => {
           onboardingStatus: "incomplete",
           privateRepoSyncEnabled: requestRepoScope,
           city: "",
-          streak: 0,
-          lastLogin: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
+          streak: 1, // Start streak
+          lastLogin: today.toISOString(),
+          createdAt: today.toISOString(),
           points: {
             gitRankPoints: 0, 
             codingVersePoints: 0,
-            streakPoints: 0,
+            streakPoints: 10, // Base points for 1st day streak
             referralPoints: 0,
-            totalPoints: 0
+            totalPoints: 10
           }
         };
         await setDoc(userDocRef, skeletalUser);
       } else {
+        // Existing user: Calculate streak safely
+        const existingData = docSnap.data();
+        let newStreak = existingData.streak || 0;
+        let newStreakPoints = existingData.points?.streakPoints || 0;
+        let newTotalPoints = existingData.points?.totalPoints || 0;
+
+        const lastLoginDate = existingData.lastLogin ? new Date(existingData.lastLogin) : null;
+
+        if (lastLoginDate) {
+          const lastLoginUTCStr = lastLoginDate.toISOString().split('T')[0];
+
+          // Only process streak logic if it's a completely new UTC day
+          if (todayUTCStr !== lastLoginUTCStr) {
+            const lastUTC = Date.UTC(lastLoginDate.getUTCFullYear(), lastLoginDate.getUTCMonth(), lastLoginDate.getUTCDate());
+            const diffDays = Math.floor((todayUTC - lastUTC) / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 1) {
+              newStreak += 1; // Perfect continuation
+            } else if (diffDays > 1) {
+              newStreak = 1; // Streak broken, restart
+            }
+
+            // Award 10 points for the new active day
+            newStreakPoints += 10;
+            newTotalPoints += 10;
+          }
+        } else {
+          // Fallback if lastLogin was somehow missing
+          newStreak = 1;
+          newStreakPoints += 10;
+          newTotalPoints += 10;
+        }
+
         await setDoc(userDocRef, {
-          lastLogin: new Date().toISOString(),
+          lastLogin: today.toISOString(),
+          streak: newStreak,
+          "points.streakPoints": newStreakPoints,
+          "points.totalPoints": newTotalPoints,
           ...(requestRepoScope && { privateRepoSyncEnabled: true })
         }, { merge: true });
       }
@@ -240,7 +281,7 @@ export const AuthProvider = ({ children }) => {
 
     if (userData.lastSync) {
       const lastSyncTime = new Date(userData.lastSync).getTime();
-      const cooldownMs = 5 * 60 * 1000;
+      const cooldownMs = 5 * 60 * 1000; // 5 minutes
       if (Date.now() - lastSyncTime < cooldownMs) {
         console.log("Background GitHub sync skipped: Cooldown active.");
         return;
@@ -251,41 +292,44 @@ export const AuthProvider = ({ children }) => {
       const ghStats = await fetchGitHubStats(user.uid, userData.githubUsername);
       const userRef = doc(db, "users", user.uid);
 
-      await runTransaction(db, async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists()) {
-          throw new Error("User document does not exist in Firestore!");
-        }
+      const userDoc = await getDoc(userRef);
+      if (!userDoc.exists()) {
+        throw new Error("User document does not exist in Firestore!");
+      }
 
-        const liveData = userDoc.data();
-        const currentReferralPoints = liveData.points?.referralPoints || 0;
-        const currentCodingVersePoints = liveData.points?.codingVersePoints || 0;
-        const currentStreakPoints = liveData.points?.streakPoints || 0;
+      const liveData = userDoc.data();
+      const currentReferralPoints = liveData.points?.referralPoints || 0;
+      const currentCodingVersePoints = liveData.points?.codingVersePoints || 0;
+      const currentStreakPoints = liveData.points?.streakPoints || 0;
 
-        const newGitRankPoints = ghStats.gitRankPoints;
-        const newTotalPoints = newGitRankPoints + currentReferralPoints + currentCodingVersePoints + currentStreakPoints;
+      const newGitRankPoints = ghStats.gitRankPoints;
+      const newTotalPoints = newGitRankPoints + currentReferralPoints + currentCodingVersePoints + currentStreakPoints;
 
-        transaction.update(userRef, {
-          "githubStats.commits": ghStats.commits,
-          "githubStats.prs": ghStats.prs,
-          "githubStats.reviews": ghStats.reviews,
-          "githubStats.repos": ghStats.publicRepos,
-          "githubStats.stars": ghStats.stars,
-          "githubStats.followers": ghStats.followers,
-          "githubStats.primaryLanguage": ghStats.primaryLanguage,
-          "points.gitRankPoints": newGitRankPoints,
-          "points.totalPoints": newTotalPoints,
-          "lastSync": new Date().toISOString()
-        });
+      // Retained the Atomic Batch Writes (Issue #193)
+      const batch = writeBatch(db);
+      
+      batch.update(userRef, {
+        "githubStats.commits": ghStats.commits,
+        "githubStats.prs": ghStats.prs,
+        "githubStats.reviews": ghStats.reviews,
+        "githubStats.repos": ghStats.publicRepos,
+        "githubStats.stars": ghStats.stars,
+        "githubStats.followers": ghStats.followers,
+        "githubStats.primaryLanguage": ghStats.primaryLanguage,
+        "points.gitRankPoints": newGitRankPoints,
+        "points.totalPoints": newTotalPoints,
+        "lastSync": new Date().toISOString()
       });
-      console.log("Background GitHub sync completed successfully.");
+
+      await batch.commit();
+      console.log("Background GitHub sync completed successfully via atomic batch.");
     } catch (error) {
       console.error("Background GitHub sync failed:", error);
     }
   };
 
   return (
-<AuthContext.Provider value={{ user, userData, loading, isOnboarding, login, logout, fetchGitHubStats, syncGitHubData, ghAccessToken }}>
+    <AuthContext.Provider value={{ user, userData, loading, isOnboarding, login, logout, fetchGitHubStats, syncGitHubData, ghAccessToken }}>
       {children}
     </AuthContext.Provider>
   );
