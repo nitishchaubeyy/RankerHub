@@ -47,14 +47,17 @@ const checkAndUpdateStreak = async (data, docRef) => {
                            (data.points?.codingVersePoints || 0) + 
                            newStreakPoints;
                            
+    const newLongestStreak = Math.max(data.longestStreak || 0, newStreak);
+
     try {
       await updateDoc(docRef, {
         streak: newStreak,
+        longestStreak: newLongestStreak,
         lastLogin: now.toISOString(),
         "points.streakPoints": newStreakPoints,
         "points.totalPoints": newTotalPoints
       });
-      console.log("Streak updated successfully. New Streak:", newStreak);
+      console.log("Streak updated successfully. New Streak:", newStreak, "| Longest:", newLongestStreak);
     } catch (err) {
       console.error("Failed to update streak:", err);
     }
@@ -151,6 +154,7 @@ export const AuthProvider = ({ children }) => {
           privateRepoSyncEnabled: requestRepoScope,
           city: "",
           streak: 0,
+          longestStreak: 0,
           lastLogin: new Date().toISOString(),
           createdAt: new Date().toISOString(),
           points: {
