@@ -35,4 +35,3 @@ export const Privacy = () => {
 };
 
 export default Privacy;
-//
