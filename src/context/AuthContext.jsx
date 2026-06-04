@@ -154,6 +154,7 @@ export const AuthProvider = ({ children }) => {
           city: "",
           streak: 0,
           longestStreak: 0,
+          githubStreak: 0,
           lastLogin: new Date().toISOString(),
           createdAt: new Date().toISOString(),
           points: {
@@ -255,7 +256,55 @@ export const AuthProvider = ({ children }) => {
         reviews = 0;
       }
 
-      const gitRankPoints = (commits * 2) + (prs * 5) + (reviews * 10);
+      // --- NEW GITHUB LIVE STREAK CALCULATION LOGIC ---
+      let githubStreak = 0;
+      try {
+        const eventsRes = await axios.get(`https://api.github.com/users/${username}/events?per_page=100`, { headers });
+        const events = eventsRes.data;
+        
+        // Extract unique dates of events (YYYY-MM-DD format)
+        const eventDates = new Set(
+          events
+            .filter(e => e.created_at)
+            .map(e => e.created_at.split('T')[0])
+        );
+        
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+        let dateToCheck = new Date(today);
+        
+        if (eventDates.has(todayStr)) {
+          // Streak is active today
+        } else if (eventDates.has(yesterdayStr)) {
+          // Streak was active yesterday, count from yesterday
+          dateToCheck = yesterday;
+        } else {
+          // No active streak
+          dateToCheck = null;
+        }
+
+        if (dateToCheck) {
+          while (true) {
+            const checkStr = dateToCheck.toISOString().split('T')[0];
+            if (eventDates.has(checkStr)) {
+              githubStreak++;
+              dateToCheck.setDate(dateToCheck.getDate() - 1);
+            } else {
+              break; // Streak broken
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("GitHub events retrieval failed for streak:", err);
+      }
+
+      // Add points for each day of the active GitHub streak (+10 XP per day)
+      const gitRankPoints = (commits * 2) + (prs * 5) + (reviews * 10) + (githubStreak * 10);
 
       return {
         commits,
@@ -265,6 +314,7 @@ export const AuthProvider = ({ children }) => {
         stars,
         followers,
         primaryLanguage,
+        githubStreak,
         gitRankPoints
       };
     } catch (error) {
@@ -277,6 +327,7 @@ export const AuthProvider = ({ children }) => {
         stars: 0,
         followers: 0,
         primaryLanguage: "JavaScript",
+        githubStreak: 0,
         gitRankPoints: 0
       };
     }
@@ -323,6 +374,7 @@ export const AuthProvider = ({ children }) => {
         "githubStats.stars": ghStats.stars,
         "githubStats.followers": ghStats.followers,
         "githubStats.primaryLanguage": ghStats.primaryLanguage,
+        "githubStreak": ghStats.githubStreak, // Syncs live streak to Firestore
         "points.gitRankPoints": newGitRankPoints,
         "points.totalPoints": newTotalPoints,
         "lastSync": new Date().toISOString()
