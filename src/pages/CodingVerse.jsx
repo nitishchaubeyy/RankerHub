@@ -1,9 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Heart, 
   MoreHorizontal, 
-  Terminal
+  Terminal,
+  Code2, 
+  Target, 
+  CheckCircle2, 
+  Award, 
+  Play, 
+  Square, 
+  Loader2 
 } from "lucide-react";
 import Card from "../components/ui/Card";
 import SectionHeader from "../components/ui/SectionHeader";
@@ -11,6 +18,150 @@ import { useAuth } from "../context/AuthContext";
 import { db } from "../lib/firebase";
 import { doc, updateDoc, query, collection, where, getCountFromServer } from "firebase/firestore";
 
+// --- Language Definitions ---
+const LANGUAGES = [
+  { id: "javascript", label: "JavaScript", monacoId: "javascript" },
+  { id: "python", label: "Python (Pyodide)", monacoId: "python" },
+];
+
+const STARTER_CODE = {
+  javascript: `// JavaScript Sandbox — runs in your browser via eval()
+// console.log outputs appear below.
+
+function twoSum(nums, target) {
+  const map = {};
+  for (let i = 0; i < nums.length; i++) {
+    const complement = target - nums[i];
+    if (map[complement] !== undefined) return [map[complement], i];
+    map[nums[i]] = i;
+  }
+  return [];
+}
+
+console.log(twoSum([2, 7, 11, 15], 9)); // [0, 1]
+console.log(twoSum([3, 2, 4], 6));       // [1, 2]
+`,
+  python: `# Python Sandbox — runs via Pyodide (WebAssembly)
+# First run loads Pyodide (~10MB), subsequent runs are instant.
+
+def two_sum(nums, target):
+    seen = {}
+    for i, n in enumerate(nums):
+        complement = target - n
+        if complement in seen:
+            return [seen[complement], i]
+        seen[n] = i
+    return []
+
+print(two_sum([2, 7, 11, 15], 9))  # [0, 1]
+print(two_sum([3, 2, 4], 6))        # [1, 2]
+`,
+};
+
+// --- JavaScript Sandboxed Executor ---
+function runJavaScript(code) {
+  const logs = [];
+  const errors = [];
+  const fakeconsole = {
+    log: (...args) => logs.push(args.map(formatValue).join(" ")),
+    error: (...args) => errors.push(args.map(formatValue).join(" ")),
+    warn: (...args) => logs.push("[WARN] " + args.map(formatValue).join(" ")),
+    info: (...args) => logs.push("[INFO] " + args.map(formatValue).join(" ")),
+  };
+
+  try {
+    // eslint-disable-next-line no-new-func
+    const fn = new Function("console", code);
+    fn(fakeconsole);
+  } catch (e) {
+    errors.push(`RuntimeError: ${e.message}`);
+  }
+
+  return { logs, errors };
+}
+
+function formatValue(v) {
+  if (v === null) return "null";
+  if (v === undefined) return "undefined";
+  if (Array.isArray(v) || typeof v === "object") {
+    try { return JSON.stringify(v); } catch { return String(v); }
+  }
+  return String(v);
+}
+
+// --- Pyodide Python Executor ---
+let pyodideInstance = null;
+let pyodideLoading = false;
+
+async function loadPyodide() {
+  if (pyodideInstance) return pyodideInstance;
+  if (pyodideLoading) {
+    // Wait for it
+    await new Promise((res) => {
+      const t = setInterval(() => { if (pyodideInstance) { clearInterval(t); res(); } }, 200);
+    });
+    return pyodideInstance;
+  }
+  pyodideLoading = true;
+  // Dynamically load Pyodide from CDN
+  if (!window.loadPyodide) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js";
+      s.onload = resolve;
+      s.onerror = () => reject(new Error("Failed to load Pyodide script"));
+      document.head.appendChild(s);
+    });
+  }
+  pyodideInstance = await window.loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.1/full/" });
+  pyodideLoading = false;
+  return pyodideInstance;
+}
+
+async function runPython(code) {
+  const logs = [];
+  const errors = [];
+  try {
+    const pyodide = await loadPyodide();
+    // Redirect stdout/stderr
+    pyodide.runPython(`
+import sys, io
+_stdout = io.StringIO()
+_stderr = io.StringIO()
+sys.stdout = _stdout
+sys.stderr = _stderr
+`);
+    try {
+      pyodide.runPython(code);
+      const out = pyodide.runPython("_stdout.getvalue()");
+      const err = pyodide.runPython("_stderr.getvalue()");
+      if (out) logs.push(...out.split("\n").filter(Boolean));
+      if (err) errors.push(...err.split("\n").filter(Boolean));
+    } catch (e) {
+      errors.push(String(e));
+    }
+  } catch (e) {
+    errors.push(`Pyodide load error: ${e.message}`);
+  }
+  return { logs, errors };
+}
+
+// --- Challenge Data ---
+const categories = [
+  { name: "Arrays & Hashing", count: 48, solved: 12, icon: Target },
+  { name: "Two Pointers & Sliders", count: 32, solved: 8, icon: Code2 },
+  { name: "Stacks & Queues", count: 24, solved: 4, icon: CheckCircle2 },
+  { name: "Trees & Graphs", count: 56, solved: 15, icon: Award },
+];
+
+const recentChallenges = [
+  { id: 1, title: "Two Sum", difficulty: "Easy", diffColor: "text-emerald-500 bg-emerald-500/10 border-emerald-500/25", xp: "+20 XP", category: "Arrays & Hashing" },
+  { id: 2, title: "Longest Substring Without Repeating Characters", difficulty: "Medium", diffColor: "text-amber-500 bg-amber-500/10 border-amber-500/25", xp: "+40 XP", category: "Two Pointers" },
+  { id: 3, title: "Merge k Sorted Lists", difficulty: "Hard", diffColor: "text-red-500 bg-red-500/10 border-red-500/25", xp: "+80 XP", category: "Linked Lists" },
+  { id: 4, title: "Trapping Rain Water", difficulty: "Hard", diffColor: "text-red-500 bg-red-500/10 border-red-500/25", xp: "+80 XP", category: "Arrays & Hashing" },
+];
+
+// --- Main CodingVerse Component ---
 export const CodingVerse = () => {
   const { userData, user } = useAuth();
   
@@ -227,6 +378,43 @@ export const CodingVerse = () => {
     }
   ];
 
+  // Sandbox state
+  const [lang, setLang] = useState("javascript");
+  const [code, setCode] = useState(STARTER_CODE.javascript);
+  const [output, setOutput] = useState([]);
+  const [running, setRunning] = useState(false);
+  const [pyodideStatus, setPyodideStatus] = useState("idle"); // idle | loading | ready
+
+  const handleLangChange = (newLang) => {
+    setLang(newLang);
+    setCode(STARTER_CODE[newLang]);
+    setOutput([]);
+  };
+
+  const runCode = useCallback(async () => {
+    setRunning(true);
+    setOutput([]);
+    const start = performance.now();
+
+    let result;
+    if (lang === "javascript") {
+      result = runJavaScript(code);
+    } else {
+      setPyodideStatus("loading");
+      result = await runPython(code);
+      setPyodideStatus("ready");
+    }
+
+    const elapsed = ((performance.now() - start) / 1000).toFixed(3);
+    const lines = [
+      ...result.logs.map((l) => ({ type: "log", text: l })),
+      ...result.errors.map((e) => ({ type: "error", text: e })),
+      { type: "info", text: `--- Done in ${elapsed}s ---` },
+    ];
+    setOutput(lines);
+    setRunning(false);
+  }, [lang, code]);
+
   // Fetch CodingVerse leaderboards rank
   useEffect(() => {
     const fetchCodingVerseRank = async () => {
@@ -359,6 +547,136 @@ export const CodingVerse = () => {
         badge="Practice Feed"
       />
 
+      {/* Live Code Sandbox */}
+      <Card className="p-6 space-y-4 max-w-6xl mx-auto">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h3 className="font-extrabold text-lg text-slate-900 dark:text-white my-0">
+              Live Execution Sandbox
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Run JavaScript instantly or Python via Pyodide (WebAssembly).
+            </p>
+          </div>
+
+          {/* Language Selector */}
+          <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
+            {LANGUAGES.map((l) => (
+              <button
+                key={l.id}
+                onClick={() => handleLangChange(l.id)}
+                className={`px-4 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
+                  lang === l.id
+                    ? "bg-violet-600 text-white"
+                    : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-900"
+                }`}
+              >
+                {l.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Code Editor (simple textarea) */}
+        <div className="relative">
+          <textarea
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            rows={12}
+            spellCheck={false}
+            className="w-full font-mono text-sm bg-slate-950 text-slate-100 rounded-xl p-4 border border-slate-800 resize-y focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+            style={{ tabSize: 2 }}
+            onKeyDown={(e) => {
+              if (e.key === "Tab") {
+                e.preventDefault();
+                const start = e.target.selectionStart;
+                const end = e.target.selectionEnd;
+                const newCode = code.substring(0, start) + "  " + code.substring(end);
+                setCode(newCode);
+                setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = start + 2; });
+              }
+            }}
+          />
+          <button
+            onClick={runCode}
+            disabled={running}
+            className={`absolute top-3 right-3 px-4 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+              running
+                ? "bg-violet-600/50 text-violet-200 cursor-not-allowed"
+                : "bg-violet-600 text-white hover:bg-violet-700 shadow-lg shadow-violet-600/30"
+            }`}
+          >
+            {running ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Play className="w-3.5 h-3.5 fill-current" />
+            )}
+            {running ? (lang === "python" && pyodideStatus === "loading" ? "Loading Pyodide…" : "Running…") : "Run"}
+          </button>
+        </div>
+
+        {/* Output Console */}
+        <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 min-h-[100px] font-mono text-xs">
+          <div className="text-slate-500 font-bold text-[10px] uppercase mb-2 flex items-center gap-1.5">
+            <Square className="w-2.5 h-2.5 fill-current text-emerald-400" />
+            Output
+          </div>
+          {output.length === 0 ? (
+            <span className="text-slate-600">
+              {running ? "Executing…" : "Press Run to see output here."}
+            </span>
+          ) : (
+            output.map((line, i) => (
+              <div
+                key={i}
+                className={
+                  line.type === "error"
+                    ? "text-red-400"
+                    : line.type === "info"
+                    ? "text-slate-500 mt-1"
+                    : "text-emerald-300"
+                }
+              >
+                {line.text}
+              </div>
+            ))
+          )}
+        </div>
+      </Card>
+
+      {/* Hero Daily Challenge Panel */}
+      <Card className="p-8 relative overflow-hidden bg-gradient-to-br from-purple-600/10 via-slate-50/0 to-slate-50/0 dark:from-purple-600/5 dark:via-slate-900/0 dark:to-slate-900/0 border-purple-500/15 max-w-6xl mx-auto">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+          <div className="space-y-4">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/20 uppercase tracking-wider">
+              Daily Featured Challenge
+            </span>
+            <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white my-0 leading-tight">
+              Edit Distance (Levenshtein)
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xl leading-relaxed">
+              Given two strings <code className="bg-slate-200/50 dark:bg-slate-800/80 px-1.5 py-0.5 rounded text-xs">word1</code> and <code className="bg-slate-200/50 dark:bg-slate-800/80 px-1.5 py-0.5 rounded text-xs">word2</code>, return the minimum number of operations required to convert <code className="bg-slate-200/50 dark:bg-slate-800/80 px-1.5 py-0.5 rounded text-xs">word1</code> to <code className="bg-slate-200/50 dark:bg-slate-800/80 px-1.5 py-0.5 rounded text-xs">word2</code>.
+            </p>
+            <div className="flex items-center gap-4 text-xs font-bold text-slate-500 pt-2">
+              <span>Difficulty: <span className="text-red-500">Hard (80 XP)</span></span>
+              <span>•</span>
+              <span>Target Time: 45 mins</span>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setCode(`// Edit Distance — try it in the sandbox above!\nfunction minDistance(word1, word2) {\n  const m = word1.length, n = word2.length;\n  const dp = Array.from({length: m+1}, (_, i) => Array.from({length: n+1}, (_, j) => i || j));\n  for (let i = 1; i <= m; i++)\n    for (let j = 1; j <= n; j++)\n      dp[i][j] = word1[i-1] === word2[j-1]\n        ? dp[i-1][j-1]\n        : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);\n  return dp[m][n];\n}\nconsole.log(minDistance("horse", "ros"));   // 3\nconsole.log(minDistance("intention", "execution")); // 5`);
+              setLang("javascript");
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="w-full lg:w-auto px-8 py-3.5 rounded-xl font-bold bg-violet-600 text-white hover:bg-violet-700 shadow-lg shadow-violet-600/25 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+          >
+            <Play className="w-4 h-4 fill-current" /> Load in Sandbox
+          </button>
+        </div>
+      </Card>
+
       {/* Main Feed Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start max-w-6xl mx-auto">
         
@@ -385,7 +703,6 @@ export const CodingVerse = () => {
                     ? "ring-1 ring-red-500/20 shadow-md shadow-red-500/5 bg-slate-900/5" 
                     : "hover:shadow-lg"
                 }`}
-                glow={false}
               >
                 {/* 1. Mascot Post Header */}
                 <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-white/40 dark:bg-slate-900/40">
@@ -677,7 +994,7 @@ export const CodingVerse = () => {
               </span>
               
               <div className="flex items-center gap-3">
-                {/* Real User Profile picture instead of random gender emojis */}
+                {/* Real User Profile picture */}
                 <img 
                   src={userData?.avatar || user?.photoURL || "https://avatars.githubusercontent.com/u/9919?v=4"} 
                   alt="Profile Avatar"
@@ -715,6 +1032,65 @@ export const CodingVerse = () => {
                   <span className="text-purple-600 dark:text-purple-400 font-extrabold">{codingVerseRank}</span>
                 </div>
               </div>
+            </div>
+          </Card>
+
+          {/* Categories Grid (from 215) */}
+          <div className="space-y-4">
+            <h4 className="text-xs font-black text-slate-950 dark:text-white uppercase tracking-wider my-0">
+              Top Categories
+            </h4>
+            <div className="grid grid-cols-1 gap-4">
+              {categories.map((cat, idx) => {
+                const Icon = cat.icon;
+                return (
+                  <Card key={idx} className="p-4 flex items-center justify-between group border-slate-200/50 dark:border-slate-800/50">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800/60 w-9 h-9 flex items-center justify-center text-slate-500 border border-slate-200/20 dark:border-slate-800/20 group-hover:scale-110 transition-transform duration-200">
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h5 className="text-[11px] font-bold text-slate-900 dark:text-white my-0">{cat.name}</h5>
+                        <p className="text-[9px] text-slate-500 uppercase font-bold">{cat.solved} / {cat.count} Solved</p>
+                      </div>
+                    </div>
+                    <div className="w-12 h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-violet-500" style={{ width: `${(cat.solved / cat.count) * 100}%` }} />
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Algorithmic Catalog (from 215) */}
+          <Card className="p-4 border-slate-200/50 dark:border-slate-800/50">
+            <h4 className="text-xs font-black text-slate-950 dark:text-white uppercase tracking-wider my-0 mb-4">
+              Featured Challenges
+            </h4>
+            <div className="space-y-3">
+              {recentChallenges.map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-2 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Code2 className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate max-w-[100px]">{item.title}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-1.5 py-0.5 text-[8px] font-bold rounded-full border ${item.diffColor}`}>
+                      {item.difficulty[0]}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setCode(STARTER_CODE.javascript);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="text-[10px] font-bold text-violet-600 hover:underline cursor-pointer"
+                    >
+                      Solve
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </Card>
 
