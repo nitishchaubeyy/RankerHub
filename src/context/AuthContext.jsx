@@ -47,14 +47,17 @@ const checkAndUpdateStreak = async (data, docRef) => {
                            (data.points?.codingVersePoints || 0) + 
                            newStreakPoints;
                            
+    const newLongestStreak = Math.max(data.longestStreak || 0, newStreak);
+
     try {
       await updateDoc(docRef, {
         streak: newStreak,
+        longestStreak: newLongestStreak,
         lastLogin: now.toISOString(),
         "points.streakPoints": newStreakPoints,
         "points.totalPoints": newTotalPoints
       });
-      console.log("Streak updated successfully. New Streak:", newStreak);
+      console.log("Streak updated successfully. New Streak:", newStreak, "| Longest:", newLongestStreak);
     } catch (err) {
       console.error("Failed to update streak:", err);
     }
@@ -155,7 +158,8 @@ export const AuthProvider = ({ children }) => {
           onboardingStatus: "incomplete",
           privateRepoSyncEnabled: requestRepoScope,
           city: "",
-          streak: 1, // Start streak
+streak: 1, // Start streak
+          longestStreak: 0,
           lastLogin: today.toISOString(),
           createdAt: today.toISOString(),
           points: {
@@ -336,6 +340,7 @@ export const AuthProvider = ({ children }) => {
       const ghStats = await fetchGitHubStats(user.uid, userData.githubUsername);
       const userRef = doc(db, "users", user.uid);
 
+// Phase 1: Retrieve Live Data
       const userDoc = await getDoc(userRef);
       if (!userDoc.exists()) {
         throw new Error("User document does not exist in Firestore!");
@@ -349,7 +354,7 @@ export const AuthProvider = ({ children }) => {
       const newGitRankPoints = ghStats.gitRankPoints;
       const newTotalPoints = newGitRankPoints + currentReferralPoints + currentCodingVersePoints + currentStreakPoints;
 
-      // Retained the Atomic Batch Writes (Issue #193)
+// Phase 2: Issue Atomic Batch Write
       const batch = writeBatch(db);
       
       batch.update(userRef, {
@@ -365,6 +370,7 @@ export const AuthProvider = ({ children }) => {
         "lastSync": new Date().toISOString()
       });
 
+// Execute atomic transaction
       await batch.commit();
       console.log("Background GitHub sync completed successfully via atomic batch.");
     } catch (error) {
