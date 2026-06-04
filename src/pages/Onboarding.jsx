@@ -150,7 +150,7 @@ export const Onboarding = () => {
       setIsLoading(false);
       return;
     }
-    if (!selectedCollege || !collegesList.includes(selectedCollege) || collegeSearch !== selectedCollege) {
+    if (!selectedCollege || selectedCollege !== collegeSearch || !collegesList.includes(selectedCollege)) {
       setError("Please select a valid college from the searchable dropdown list.");
       setIsLoading(false);
       return;
