@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Search, Filter, Star, Trophy, RefreshCw, GitCommit, Calendar, BookOpen, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Search, Filter, Star, Trophy, RefreshCw, GitCommit, Calendar, BookOpen, AlertCircle, CheckCircle2, Users, Medal } from "lucide-react";
 import { collection, query, doc, where, orderBy, limit, startAfter, onSnapshot, getDocs, runTransaction } from "firebase/firestore";
 import { useSearchParams } from "react-router-dom";
+import { TableVirtuoso } from "react-virtuoso"; 
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import Card from "../components/ui/Card";
@@ -11,9 +12,38 @@ import axios from "axios";
 
 export const GitRank = () => {
   const { user, userData, fetchGitHubStats, login } = useAuth();
-  const [searchParams] = useSearchParams();
-  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
-  const [selectedLanguage, setSelectedLanguage] = useState("All");
+
+  // ============================================================
+  // ISSUE #194: URL Parameter Sync for State Persistence
+  // ============================================================
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchTerm = searchParams.get("search") || "";
+  const selectedLanguage = searchParams.get("lang") || "All";
+
+  // Active Tab for Referral Leaderboard (Issue #310) - Now synced with URL
+  const activeTab = searchParams.get("tab") || "gitrank";
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    const newParams = new URLSearchParams(searchParams);
+    if (val) newParams.set("search", val);
+    else newParams.delete("search");
+    // Use replace: true so we don't bloat the browser history with every keystroke
+    setSearchParams(newParams, { replace: true });
+  };
+
+  const handleLanguageChange = (lang) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (lang !== "All") newParams.set("lang", lang);
+    else newParams.delete("lang");
+    setSearchParams(newParams);
+  };
+
+  const handleTabChange = (tabName) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("tab", tabName);
+    setSearchParams(newParams);
+  };
   
   // Pagination States
   const [lastVisible, setLastVisible] = useState(null); 
@@ -34,28 +64,37 @@ export const GitRank = () => {
   const [events, setEvents] = useState([]);
   const [repos, setRepos] = useState([]);
   const [loadingCharts, setLoadingCharts] = useState(true);
+  const [chartRateLimitError, setChartRateLimitError] = useState("");
 
   const languages = ["All", "TypeScript", "Rust", "Go", "Python", "Kotlin", "Ruby", "JavaScript"];
 
-  // 1. Real-time Leaderboard Listener (Initial 50 Users)
+  // 1. Real-time Leaderboard Listener (Server-Side Filtered)
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingUsers(true);
 
-    if (!user) {
-      const timer = setTimeout(() => {
-        setLoadingUsers(false);
-      }, 0);
-      return () => clearTimeout(timer);
+    // Build the query dynamically based on Active Tab
+    const constraints = [
+      where("onboardingStatus", "==", "complete"),
+    ];
+
+    if (activeTab === "gitrank") {
+      constraints.push(orderBy("points.gitRankPoints", "desc"));
+      constraints.push(orderBy("githubStats.commits", "desc"));
+    } else {
+      constraints.push(orderBy("points.referralPoints", "desc"));
+    }
+    
+    constraints.push(orderBy("githubUsername", "asc"));
+
+    // DB level language filter
+    if (selectedLanguage !== "All") {
+      constraints.push(where("githubStats.primaryLanguage", "==", selectedLanguage));
     }
 
-    // Combined query: onboarding check (from your branch) + limit 50 (from main)
-    const q = query(
-      collection(db, "users"),
-      where("onboardingStatus", "==", "complete"),
-      orderBy("points.totalPoints", "desc"),
-      limit(50) 
-    );
+    constraints.push(limit(50));
+
+    const q = query(collection(db, "users"), ...constraints);
 
     const unsubscribe = onSnapshot(
       q,
@@ -65,15 +104,12 @@ export const GitRank = () => {
           users.push(doc.data());
         });
 
-        // Assign ranks (pre-sorted at database level)
         const ranked = users.map((u, i) => ({
           ...u,
           rank: i + 1
         }));
 
         setUsersList(ranked);
-        
-        // Setup pagination cursors
         setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
         setHasMore(snapshot.docs.length === 50); 
         setLoadingUsers(false);
@@ -85,20 +121,35 @@ export const GitRank = () => {
     );
 
     return () => unsubscribe();
-  }, [user]);
+  }, [selectedLanguage, activeTab]); 
+
   // Pagination Function (Fetch next 50)
   const loadMoreUsers = async () => {
     if (!lastVisible || !hasMore || loadingMore) return;
 
     setLoadingMore(true);
     try {
-      const nextQuery = query(
-        collection(db, "users"),
-        orderBy("points.totalPoints", "desc"),
-        startAfter(lastVisible),
-        limit(50)
-      );
+      const constraints = [
+        where("onboardingStatus", "==", "complete"),
+      ];
 
+      if (activeTab === "gitrank") {
+        constraints.push(orderBy("points.gitRankPoints", "desc"));
+        constraints.push(orderBy("githubStats.commits", "desc"));
+      } else {
+        constraints.push(orderBy("points.referralPoints", "desc"));
+      }
+      
+      constraints.push(orderBy("githubUsername", "asc"));
+
+      if (selectedLanguage !== "All") {
+        constraints.push(where("githubStats.primaryLanguage", "==", selectedLanguage));
+      }
+
+      constraints.push(startAfter(lastVisible));
+      constraints.push(limit(50));
+
+      const nextQuery = query(collection(db, "users"), ...constraints);
       const snapshot = await getDocs(nextQuery);
 
       if (snapshot.empty) {
@@ -112,14 +163,13 @@ export const GitRank = () => {
         newUsers.push(doc.data());
       });
 
-      setUsersList((prevUsers) => {
-        const combinedUsers = [...prevUsers, ...newUsers];
-        return combinedUsers.map((u, i) => ({
-          ...u,
-          rank: i + 1
-        }));
-      });
+      const currentLength = usersList.length;
+      const rankedNewUsers = newUsers.map((u, i) => ({
+        ...u,
+        rank: currentLength + i + 1
+      }));
 
+      setUsersList((prevUsers) => [...prevUsers, ...rankedNewUsers]);
       setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
       setHasMore(snapshot.docs.length === 50);
     } catch (error) {
@@ -129,14 +179,48 @@ export const GitRank = () => {
     }
   };
 
-  // 2. Fetch GitHub Events/Repos for Charts
+  // 2. Fetch GitHub Events/Repos for Charts (Authenticated Only)
   useEffect(() => {
-    if (!userData?.githubUsername) return;
+    if (!userData?.githubUsername) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoadingCharts(false);
+      return;
+    }
 
     const fetchAnalytics = async () => {
       setLoadingCharts(true);
+      setChartRateLimitError("");
       const token = sessionStorage.getItem(`gh_token_${user?.uid}`);
       const headers = token ? { Authorization: `token ${token}` } : {};
+      const now = Date.now();
+      const fifteenMinutes = 15 * 60 * 1000;
+
+      const isRateLimited = (err) => {
+        const status = err?.response?.status;
+        return status === 403 || status === 429;
+      };
+
+      const getFromCache = (key) => {
+        const cached = localStorage.getItem(key);
+        if (!cached) return null;
+        try {
+          const entry = JSON.parse(cached);
+          const age = now - entry.timestamp;
+          return age < fifteenMinutes ? entry.data : null;
+        } catch {
+          return null;
+        }
+      };
+
+      const saveToCache = (key, data) => {
+        try {
+          localStorage.setItem(key, JSON.stringify({ data, timestamp: now }));
+        } catch {
+          console.warn("Failed to save to localStorage");
+        }
+      };
+
+      let hasRateLimitError = false;
 
       try {
         const eventsRes = await axios.get(
@@ -144,8 +228,24 @@ export const GitRank = () => {
           { headers }
         );
         setEvents(eventsRes.data || []);
+        saveToCache(`events_${userData.githubUsername}`, eventsRes.data);
       } catch (err) {
-        console.warn("Failed to fetch events for charts:", err);
+        if (isRateLimited(err)) {
+          hasRateLimitError = true;
+          const cached = getFromCache(`events_${userData.githubUsername}`);
+          if (cached) {
+            setEvents(cached);
+            console.log("Using cached events data");
+          } else {
+            setEvents([]);
+          }
+        } else {
+          console.warn("Failed to fetch events for charts:", err);
+          const cached = getFromCache(`events_${userData.githubUsername}`);
+          if (cached) {
+            setEvents(cached);
+          }
+        }
       }
 
       try {
@@ -154,9 +254,32 @@ export const GitRank = () => {
           { headers }
         );
         setRepos(reposRes.data || []);
+        saveToCache(`repos_${userData.githubUsername}`, reposRes.data);
       } catch (err) {
-        console.warn("Failed to fetch repos for charts:", err);
+        if (isRateLimited(err)) {
+          hasRateLimitError = true;
+          const cached = getFromCache(`repos_${userData.githubUsername}`);
+          if (cached) {
+            setRepos(cached);
+            console.log("Using cached repos data");
+          } else {
+            setRepos([]);
+          }
+        } else {
+          console.warn("Failed to fetch repos for charts:", err);
+          const cached = getFromCache(`repos_${userData.githubUsername}`);
+          if (cached) {
+            setRepos(cached);
+          }
+        }
       }
+
+      if (hasRateLimitError) {
+        setChartRateLimitError(
+          "GitHub API rate limit reached. Displaying cached data. Please wait a few minutes and reload the page for fresh data."
+        );
+      }
+
       setLoadingCharts(false);
     };
 
@@ -242,28 +365,22 @@ export const GitRank = () => {
     return `${mins}m ${secs}s`;
   };
 
-  // Filter leaderboard lists
+  // Filter leaderboard lists (Only Search is client side now)
   const filteredData = useMemo(() => {
-    return usersList.filter((user) => {
-      const name = user.name || "";
-      const username = user.githubUsername || "";
-      const matchesSearch =
-        name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        username.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const lang = user.githubStats?.primaryLanguage || "JavaScript";
-      const matchesLang = selectedLanguage === "All" || lang === selectedLanguage;
-
-      return matchesSearch && matchesLang;
+    return usersList.filter((u) => {
+      const name = u.name || "";
+      const username = u.githubUsername || "";
+      return name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+             username.toLowerCase().includes(searchTerm.toLowerCase());
     });
-  }, [usersList, searchTerm, selectedLanguage]);
+  }, [usersList, searchTerm]);
 
   // Grab Top 3 Contributors
   const topContributors = useMemo(() => {
     return usersList.slice(0, 3);
   }, [usersList]);
 
-  // Chart Parsing 1: Weekly Activity
+  // Chart Parsing
   const weeklyActivityData = useMemo(() => {
     const weeks = Array.from({ length: 8 }, (_, idx) => {
       const start = new Date();
@@ -273,19 +390,6 @@ export const GitRank = () => {
       const label = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
       return { start, end, commits: 0, prs: 0, reviews: 0, label };
     }).reverse();
-
-    if (!events.length) {
-      return [
-        { label: "Wk 1", commits: 2, prs: 0, reviews: 0 },
-        { label: "Wk 2", commits: 6, prs: 1, reviews: 0 },
-        { label: "Wk 3", commits: 4, prs: 0, reviews: 1 },
-        { label: "Wk 4", commits: 9, prs: 2, reviews: 0 },
-        { label: "Wk 5", commits: 14, prs: 3, reviews: 1 },
-        { label: "Wk 6", commits: 11, prs: 1, reviews: 2 },
-        { label: "Wk 7", commits: 7, prs: 4, reviews: 1 },
-        { label: "Wk 8", commits: 18, prs: 5, reviews: 3 }
-      ];
-    }
 
     events.forEach((event) => {
       const eventDate = new Date(event.created_at);
@@ -304,15 +408,9 @@ export const GitRank = () => {
     return weeks;
   }, [events]);
 
-  // Chart Parsing 2: Languages Frequency
   const languageChartData = useMemo(() => {
-    if (!repos.length) {
-      return [
-        { name: "TypeScript", count: 8, percent: 50, color: "#3178c6" },
-        { name: "JavaScript", count: 5, percent: 31, color: "#f1e05a" },
-        { name: "Python", count: 3, percent: 19, color: "#3572A5" }
-      ];
-    }
+    if (!repos.length) return []; 
+    
     const counts = {};
     repos.forEach((r) => {
       if (r.language) {
@@ -344,15 +442,9 @@ export const GitRank = () => {
       .slice(0, 5);
   }, [repos]);
 
-  // Chart Parsing 3: Repository Contributions
   const repositoryContributionData = useMemo(() => {
-    if (!events.length) {
-      return [
-        { name: "portfolio-website", commits: 15, percent: 45 },
-        { name: "react-dashboard", commits: 10, percent: 30 },
-        { name: "express-api-gateway", commits: 8, percent: 25 }
-      ];
-    }
+    if (!events.length) return [];
+
     const counts = {};
     events.forEach((e) => {
       if (e.type === "PushEvent" && e.repo?.name) {
@@ -371,7 +463,6 @@ export const GitRank = () => {
       .slice(0, 5);
   }, [events]);
 
-  // SVG Line Chart coordinates calculation
   const maxVal = Math.max(
     ...weeklyActivityData.map((d) => d.commits),
     ...weeklyActivityData.map((d) => d.prs),
@@ -422,7 +513,7 @@ export const GitRank = () => {
     : "";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8 overflow-x-hidden">
       {/* Page Header */}
       <SectionHeader
         title="GitRank Rating Engine"
@@ -433,27 +524,27 @@ export const GitRank = () => {
       {/* 1. Authenticated User's Real-time Panel */}
       {user ? (
         <div className="space-y-6">
-          <Card className="p-6 relative overflow-hidden bg-gradient-to-br from-violet-600/5 via-transparent to-blue-500/5 border-slate-200/60 dark:border-slate-800/60">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+          <Card className="!p-4 sm:!p-6 relative overflow-hidden bg-gradient-to-br from-violet-600/5 via-transparent to-blue-500/5 border-slate-200/60 dark:border-slate-800/60">
+            <div className="flex flex-col items-center justify-between gap-5 sm:gap-6 lg:gap-8">
               {/* Profile details */}
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl overflow-hidden ring-4 ring-violet-500/20 shadow-lg">
+              <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full text-center sm:text-left">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-2xl overflow-hidden ring-4 ring-violet-500/20 shadow-lg shrink-0">
                   <img
                     src={userData?.avatar || user.photoURL}
                     alt={userData?.name}
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <div>
-                  <h3 className="text-xl font-black text-slate-900 dark:text-white my-0">
+                <div className="min-w-0 w-full">
+                  <h3 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 dark:text-white my-0 truncate">
                     {userData?.name || "Developer"}
                   </h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs font-semibold text-slate-400">
+                  <div className="flex items-center justify-center sm:justify-start gap-2 mt-1.5 flex-wrap">
+                    <span className="text-xs sm:text-sm font-semibold text-slate-400 truncate">
                       @{userData?.githubUsername || "github"}
                     </span>
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0 hidden sm:block" />
+                    <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest shrink-0 border sm:border-0 border-slate-200 dark:border-slate-700 px-2 sm:px-0 py-0.5 sm:py-0 rounded-md sm:rounded-none">
                       Real-time Synced
                     </span>
                   </div>
@@ -461,58 +552,58 @@ export const GitRank = () => {
               </div>
 
               {/* Stats Panel */}
-              <div className="flex flex-wrap items-center justify-center md:justify-end gap-6 text-center">
-                <div className="px-4 py-2 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200/30 dark:border-slate-800/30 min-w-[90px]">
-                  <span className="block font-black text-blue-500 text-lg leading-none">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 w-full text-center">
+                <div className="px-2 sm:px-4 py-2.5 sm:py-3 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200/30 dark:border-slate-800/30 flex flex-col items-center justify-center">
+                  <span className="block font-black text-blue-500 text-lg sm:text-xl leading-none">
                     {userData?.githubStats?.commits || 0}
                   </span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1 block">
+                  <span className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1.5 block">
                     Commits
                   </span>
                 </div>
-                <div className="px-4 py-2 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200/30 dark:border-slate-800/30 min-w-[90px]">
-                  <span className="block font-black text-violet-500 text-lg leading-none">
+                <div className="px-2 sm:px-4 py-2.5 sm:py-3 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200/30 dark:border-slate-800/30 flex flex-col items-center justify-center">
+                  <span className="block font-black text-violet-500 text-lg sm:text-xl leading-none">
                     {userData?.githubStats?.prs || 0}
                   </span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1 block">
+                  <span className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1.5 block">
                     PRs
                   </span>
                 </div>
-                <div className="px-4 py-2 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200/30 dark:border-slate-800/30 min-w-[90px]">
-                  <span className="block font-black text-pink-500 text-lg leading-none">
+                <div className="px-2 sm:px-4 py-2.5 sm:py-3 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200/30 dark:border-slate-800/30 flex flex-col items-center justify-center">
+                  <span className="block font-black text-pink-500 text-lg sm:text-xl leading-none">
                     {userData?.githubStats?.reviews || 0}
                   </span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1 block">
+                  <span className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1.5 block">
                     Reviews
                   </span>
                 </div>
-                <div className="px-4 py-2 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200/30 dark:border-slate-800/30 min-w-[90px]">
-                  <span className="block font-black text-emerald-500 text-lg leading-none">
+                <div className="px-2 sm:px-4 py-2.5 sm:py-3 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200/30 dark:border-slate-800/30 flex flex-col items-center justify-center">
+                  <span className="block font-black text-emerald-500 text-lg sm:text-xl leading-none">
                     {userData?.points?.gitRankPoints || 0}
                   </span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1 block">
+                  <span className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1.5 block">
                     GitPoints
                   </span>
                 </div>
               </div>
 
               {/* Sync Actions */}
-              <div className="w-full md:w-auto flex flex-col items-center md:items-end gap-2">
+              <div className="w-full flex flex-col items-center gap-2">
                 <GradientButton
                   onClick={handleSync}
                   disabled={isSyncing || cooldownSeconds > 0}
-                  className="w-full md:w-auto px-5 py-2.5 text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-violet-500/10"
+                  className="w-full px-4 sm:px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-violet-500/10"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+                  <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`} />
                   {isSyncing
-                    ? "Syncing GitHub..."
+                    ? "Syncing..."
                     : cooldownSeconds > 0
                     ? `Retry in ${formatCooldown(cooldownSeconds)}`
-                    : "Sync GitHub Data"}
+                    : "Sync Data"}
                 </GradientButton>
 
                 {userData?.lastSync && (
-                  <span className="text-[10px] text-slate-400 font-medium">
+                  <span className="text-[10px] sm:text-xs text-slate-400 font-medium">
                     Last sync: {new Date(userData.lastSync).toLocaleString()}
                   </span>
                 )}
@@ -534,10 +625,17 @@ export const GitRank = () => {
             )}
           </Card>
 
+          {/* Rate limit error for charts */}
+          {chartRateLimitError && (
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-xl">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{chartRateLimitError}</span>
+            </div>
+          )}
+
           {/* User GitHub Graphs & Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* SVG Weekly activity trend */}
-            <Card className="p-5 flex flex-col justify-between">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+            <Card className="!p-3 sm:!p-5 flex flex-col justify-between">
               <div>
                 <h4 className="font-extrabold text-slate-900 dark:text-white mt-0 mb-1 flex items-center gap-1.5">
                   <Calendar className="w-4.5 h-4.5 text-violet-500" /> Recent Activity Trend
@@ -554,7 +652,6 @@ export const GitRank = () => {
               ) : (
                 <div className="w-full flex items-center justify-center">
                   <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-auto overflow-visible">
-                    {/* Gridlines */}
                     {[0, 0.25, 0.5, 0.75, 1].map((r, i) => {
                       const y = chartHeight - paddingY - r * (chartHeight - 2 * paddingY);
                       return (
@@ -570,7 +667,6 @@ export const GitRank = () => {
                       );
                     })}
 
-                    {/* Commits Area/Line */}
                     {areaCommits && (
                       <path d={areaCommits} className="fill-blue-500/5 dark:fill-blue-500/5" />
                     )}
@@ -585,7 +681,6 @@ export const GitRank = () => {
                       />
                     )}
 
-                    {/* PR Area/Line */}
                     {areaPrs && (
                       <path d={areaPrs} className="fill-violet-500/5 dark:fill-violet-500/5" />
                     )}
@@ -600,7 +695,6 @@ export const GitRank = () => {
                       />
                     )}
 
-                    {/* Reviews Area/Line */}
                     {areaReviews && (
                       <path d={areaReviews} className="fill-pink-500/5 dark:fill-pink-500/5" />
                     )}
@@ -615,7 +709,6 @@ export const GitRank = () => {
                       />
                     )}
 
-                    {/* Interaction Dots */}
                     {pointsCommits.map((p, i) => (
                       <circle
                         key={`c-${i}`}
@@ -637,7 +730,6 @@ export const GitRank = () => {
                       />
                     ))}
 
-                    {/* X-axis Labels */}
                     {weeklyActivityData.map((d, i) => {
                       const x = paddingX + (i / (weeklyActivityData.length - 1)) * (chartWidth - 2 * paddingX);
                       return (
@@ -656,7 +748,6 @@ export const GitRank = () => {
                 </div>
               )}
 
-              {/* Chart Legend */}
               <div className="flex items-center justify-center gap-4 text-[10px] font-bold text-slate-400 mt-2">
                 <span className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-blue-500" /> Commits
@@ -670,8 +761,7 @@ export const GitRank = () => {
               </div>
             </Card>
 
-            {/* Language Breakdown */}
-            <Card className="p-5 flex flex-col justify-between">
+            <Card className="!p-3 sm:!p-5 flex flex-col justify-between">
               <div>
                 <h4 className="font-extrabold text-slate-900 dark:text-white mt-0 mb-1 flex items-center gap-1.5">
                   <BookOpen className="w-4.5 h-4.5 text-violet-500" /> Languages Distribution
@@ -684,6 +774,11 @@ export const GitRank = () => {
               {loadingCharts ? (
                 <div className="h-[160px] flex items-center justify-center">
                   <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : languageChartData.length === 0 ? (
+                <div className="h-[160px] flex flex-col items-center justify-center text-slate-400 space-y-2">
+                  <BookOpen className="w-8 h-8 opacity-20" />
+                  <span className="text-[11px] font-semibold">No language data found</span>
                 </div>
               ) : (
                 <div className="space-y-3.5 flex-1 flex flex-col justify-center">
@@ -713,8 +808,7 @@ export const GitRank = () => {
               )}
             </Card>
 
-            {/* Repository breakdown */}
-            <Card className="p-5 flex flex-col justify-between">
+            <Card className="!p-3 sm:!p-5 flex flex-col justify-between">
               <div>
                 <h4 className="font-extrabold text-slate-900 dark:text-white mt-0 mb-1 flex items-center gap-1.5">
                   <GitCommit className="w-4.5 h-4.5 text-violet-500" /> Recent Repos Activity
@@ -727,6 +821,11 @@ export const GitRank = () => {
               {loadingCharts ? (
                 <div className="h-[160px] flex items-center justify-center">
                   <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : repositoryContributionData.length === 0 ? (
+                <div className="h-[160px] flex flex-col items-center justify-center text-slate-400 space-y-2">
+                  <GitCommit className="w-8 h-8 opacity-20" />
+                  <span className="text-[11px] font-semibold">No recent activity found</span>
                 </div>
               ) : (
                 <div className="space-y-3.5 flex-1 flex flex-col justify-center">
@@ -750,8 +849,7 @@ export const GitRank = () => {
           </div>
         </div>
       ) : (
-        /* Guest User CTA */
-        <Card className="p-8 text-center max-w-xl mx-auto space-y-6 bg-gradient-to-br from-violet-600/10 via-transparent to-blue-500/10 border-violet-500/20 backdrop-blur-md">
+        <Card className="p-6 sm:p-8 text-center max-w-xl mx-auto space-y-6 bg-gradient-to-br from-violet-600/10 via-transparent to-blue-500/10 border-violet-500/20 backdrop-blur-md">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-violet-500/25">
             <Trophy className="w-8 h-8" />
           </div>
@@ -772,10 +870,15 @@ export const GitRank = () => {
         </Card>
       )}
 
-      {/* 2. Top 3 Contributors Grid */}
+      {/* 2. Top 3 Contributors Grid (Dynamically adjust based on active tab) */}
       {!loadingUsers && topContributors.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {topContributors.map((u, idx) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {topContributors.map((u, idx) => {
+            const isCurrentUser = user && u.uid === user.uid;
+            const displayName = isCurrentUser ? (userData?.name || u.name) : u.name;
+            const displayAvatar = isCurrentUser ? (userData?.avatar || user?.photoURL || u.avatar) : u.avatar;
+
+            return (
             <Card
               key={u.uid}
               className={`
@@ -799,12 +902,12 @@ export const GitRank = () => {
                 </span>
 
                 <div className="w-16 h-16 rounded-2xl overflow-hidden ring-4 ring-violet-500/10 shadow-md">
-                  <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" />
+                  <img src={displayAvatar} alt={displayName} className="w-full h-full object-cover" />
                 </div>
 
                 <div>
                   <h4 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight">
-                    {u.name}
+                    {displayName}
                   </h4>
                   <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">
                     @{u.githubUsername}
@@ -817,48 +920,94 @@ export const GitRank = () => {
               </div>
 
               <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800/80 w-full flex items-center justify-around text-xs">
-                <div>
-                  <span className="block font-black text-slate-900 dark:text-white leading-none">
-                    {u.githubStats?.commits || 0}
-                  </span>
-                  <span className="text-[9px] text-slate-400 font-bold uppercase mt-1 block">Commits</span>
-                </div>
-                <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-800" />
-                <div>
-                  <span className="block font-black text-violet-600 dark:text-violet-400 leading-none">
-                    {u.points?.totalPoints?.toLocaleString() || 0}
-                  </span>
-                  <span className="text-[9px] text-slate-400 font-bold uppercase mt-1 block">Points</span>
-                </div>
+                {activeTab === "gitrank" ? (
+                  <>
+                    <div>
+                      <span className="block font-black text-slate-900 dark:text-white leading-none">
+                        {u.githubStats?.commits || 0}
+                      </span>
+                      <span className="text-[9px] text-slate-400 font-bold uppercase mt-1 block">Commits</span>
+                    </div>
+                    <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-800" />
+                    <div>
+                      <span className="block font-black text-violet-600 dark:text-violet-400 leading-none">
+                        {u.points?.gitRankPoints?.toLocaleString() || 0}
+                      </span>
+                      <span className="text-[9px] text-slate-400 font-bold uppercase mt-1 block">Git Points</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <span className="block font-black text-slate-900 dark:text-white leading-none">
+                        {Math.floor((u.points?.referralPoints || 0) / 100)}
+                      </span>
+                      <span className="text-[9px] text-slate-400 font-bold uppercase mt-1 block">Valid Invites</span>
+                    </div>
+                    <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-800" />
+                    <div>
+                      <span className="block font-black text-emerald-600 dark:text-emerald-400 leading-none">
+                        {u.points?.referralPoints?.toLocaleString() || 0}
+                      </span>
+                      <span className="text-[9px] text-slate-400 font-bold uppercase mt-1 block">Referral Pts</span>
+                    </div>
+                  </>
+                )}
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {/* 3. Leaderboard Table / Search & Filters Controls */}
-      <Card className="p-6">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-800">
-          {/* Search */}
+      <Card className="!p-3 sm:!p-6">
+        
+        {/* NEW TAB SYSTEM FOR REFERRAL LEADERBOARD */}
+        <div className="flex items-center gap-2 mb-6 p-1 bg-slate-100 dark:bg-slate-800/50 rounded-xl w-fit">
+          <button
+            onClick={() => handleTabChange("gitrank")}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${
+              activeTab === "gitrank"
+                ? "bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-400 shadow-sm"
+                : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+            }`}
+          >
+            <GitCommit className="w-3.5 h-3.5" />
+            GitRank Leaderboard
+          </button>
+          <button
+            onClick={() => handleTabChange("referrals")}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${
+              activeTab === "referrals"
+                ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm"
+                : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            Top Recruiters
+          </button>
+        </div>
+
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-800">
           <div className="relative w-full sm:max-w-xs">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search user..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearchChange}
               className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white/40 dark:bg-slate-950/20 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 dark:text-white transition-all"
             />
           </div>
 
-          {/* Languages Filter List */}
-          <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0 scrollbar-none">
+          <div className="flex items-center gap-2 overflow-x-auto w-full lg:w-auto pb-2 lg:pb-0 scrollbar-none">
             <Filter className="w-4 h-4 text-slate-400 flex-shrink-0" />
             <div className="flex gap-1.5">
               {languages.map((lang) => (
                 <button
                   key={lang}
-                  onClick={() => setSelectedLanguage(lang)}
+                  onClick={() => handleLanguageChange(lang)}
                   className={`
                     px-2.5 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer whitespace-nowrap
                     ${
@@ -875,134 +1024,109 @@ export const GitRank = () => {
           </div>
         </div>
 
-        {/* Responsive Table UI */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-hidden w-full">
           {loadingUsers ? (
             <div className="py-20 text-center text-slate-400">
               <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
               <p className="text-sm font-bold">Synchronizing Live Standings...</p>
             </div>
-          ) : !user ? (
-            /* Locked Leaderboard state for guests */
-            <div className="py-16 text-center text-slate-400 dark:text-slate-500 max-w-sm mx-auto">
-              <Trophy className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-700 mb-3" />
-              <p className="text-sm font-bold">Leaderboard Standings Locked</p>
-              <p className="text-xs mt-1 leading-relaxed">
-                Please authenticate with your GitHub account to unlock the global standings and compare your stats with other developers.
-              </p>
-              <button
-                onClick={login}
-                className="mt-4 px-4 py-2 bg-violet-600 text-white font-bold text-xs rounded-xl shadow-md hover:bg-violet-700 transition-colors"
-              >
-                Log In Now
-              </button>
-            </div>
-          ) : (
-            <table className="w-full text-left mt-4 border-collapse">
-              <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-800/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  <th className="py-3 px-4">Rank</th>
-                  <th className="py-3 px-4">Developer</th>
-                  <th className="py-3 px-4">Focus Language</th>
-                  <th className="py-3 px-4 text-center">Streak</th>
-                  <th className="py-3 px-4 text-center">Commits</th>
-                  <th className="py-3 px-4 text-center">PRs</th>
-                  <th className="py-3 px-4 text-center">Reviews</th>
-                  <th className="py-3 px-4 text-right">XP Points</th>
+          ) : filteredData.length > 0 ? (
+            <TableVirtuoso
+              useWindowScroll
+              data={filteredData}
+              components={{
+                Table: (props) => <table {...props} className="w-full text-left mt-4 border-collapse min-w-[640px]" />,
+                TableHead: React.forwardRef((props, ref) => <thead {...props} ref={ref} />),
+                TableRow: (props) => <tr {...props} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors group" />,
+                TableBody: React.forwardRef((props, ref) => <tbody {...props} ref={ref} className="divide-y divide-slate-100 dark:divide-slate-800/40 text-sm" />),
+              }}
+              fixedHeaderContent={() => (
+                <tr className="border-b border-slate-100 dark:border-slate-800/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-white dark:bg-slate-950 z-10 relative shadow-sm">
+                  <th className="py-3 px-2 sm:px-4">Rank</th>
+                  <th className="py-3 px-2 sm:px-4">Developer</th>
+                  <th className="py-3 px-2 sm:px-4">Language</th>
+                  
+                  {/* DYNAMIC COLUMNS BASED ON ACTIVE TAB */}
+                  {activeTab === "gitrank" ? (
+                    <>
+                      <th className="py-3 px-2 sm:px-4 text-center">Commits</th>
+                      <th className="py-3 px-2 sm:px-4 text-center">PRs</th>
+                      <th className="py-3 px-2 sm:px-4 text-center">Reviews</th>
+                      <th className="py-3 px-2 sm:px-4 text-right">Git Points</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="py-3 px-2 sm:px-4 text-center">Invites Sent</th>
+                      <th className="py-3 px-2 sm:px-4 text-center">Recruiter Status</th>
+                      <th className="py-3 px-2 sm:px-4 text-right">Referral Points</th>
+                    </>
+                  )}
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40 text-sm">
-                {filteredData.length > 0 ? (
-                  filteredData.map((u) => (
-                    <tr
-                      key={u.uid}
-                      className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors group"
-                    >
-                      {/* Rank cell */}
-                      <td className="py-4 px-4 font-bold text-slate-500">#{u.rank}</td>
+              )}
+              itemContent={(index, u) => {
+                const isCurrentUser = user && u.uid === user.uid;
+                const displayName = isCurrentUser ? (userData?.name || u.name) : u.name;
+                const displayAvatar = isCurrentUser ? (userData?.avatar || user?.photoURL || u.avatar) : u.avatar;
 
-                      {/* Developer profile cell */}
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0">
-                            <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" />
-                          </div>
-                          <div>
-                            <span className="font-extrabold text-slate-900 dark:text-white block group-hover:text-violet-500 transition-colors">
-                              {u.name}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-semibold block">
-                              @{u.githubUsername}
-                            </span>
-                          </div>
-                        </div>
+                return (
+                <>
+                  <td className="py-3 sm:py-4 px-2 sm:px-4 font-bold text-slate-500">#{u.rank}</td>
+                  <td className="py-3 sm:py-4 px-2 sm:px-4">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg overflow-hidden flex-shrink-0">
+                        <img src={displayAvatar} alt={displayName} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="font-extrabold text-slate-900 dark:text-white block group-hover:text-violet-500 transition-colors truncate text-xs sm:text-sm">{displayName}</span>
+                        <span className="text-[9px] sm:text-[10px] text-slate-400 font-semibold block truncate">@{u.githubUsername}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-3 sm:py-4 px-2 sm:px-4">
+                    <span className="px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/10 dark:border-slate-800/10">{u.githubStats?.primaryLanguage || "JS"}</span>
+                  </td>
+                  
+                  {/* DYNAMIC ROW CONTENT BASED ON ACTIVE TAB */}
+                  {activeTab === "gitrank" ? (
+                    <>
+                      <td className="py-3 sm:py-4 px-2 sm:px-4 text-center font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-sm">{u.githubStats?.commits || 0}</td>
+                      <td className="py-3 sm:py-4 px-2 sm:px-4 text-center font-bold text-violet-600 dark:text-violet-400 text-xs sm:text-sm">{u.githubStats?.prs || 0}</td>
+                      <td className="py-3 sm:py-4 px-2 sm:px-4 text-center font-bold text-pink-600 dark:text-pink-400 text-xs sm:text-sm">{u.githubStats?.reviews || 0}</td>
+                      <td className="py-3 sm:py-4 px-2 sm:px-4 text-right font-black text-slate-900 dark:text-white text-xs sm:text-sm">{u.points?.gitRankPoints?.toLocaleString() || 0}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="py-3 sm:py-4 px-2 sm:px-4 text-center font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-sm">{Math.floor((u.points?.referralPoints || 0) / 100)}</td>
+                      <td className="py-3 sm:py-4 px-2 sm:px-4 text-center">
+                        {(u.points?.referralPoints || 0) >= 1000 ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-black text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-lg">
+                            <Medal className="w-3 h-3" /> Ambassador
+                          </span>
+                        ) : (
+                          <span className="text-[10px] sm:text-xs font-bold text-slate-400">Recruiter</span>
+                        )}
                       </td>
-
-                      {/* Language tag cell */}
-                      <td className="py-4 px-4">
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/10 dark:border-slate-800/10">
-                          {u.githubStats?.primaryLanguage || "JavaScript"}
-                        </span>
-                      </td>
-
-                      {/* Streak flame cell */}
-                      <td className="py-4 px-4 text-center font-bold text-orange-600 dark:text-orange-400 whitespace-nowrap">
-                        🔥 {u.streak ?? 0} days
-                      </td>
-
-                      {/* Commits count cell */}
-                      <td className="py-4 px-4 text-center font-bold text-slate-800 dark:text-slate-200">
-                        {u.githubStats?.commits || 0}
-                      </td>
-
-                      {/* PRs count cell */}
-                      <td className="py-4 px-4 text-center font-bold text-violet-600 dark:text-violet-400">
-                        {u.githubStats?.prs || 0}
-                      </td>
-
-                      {/* Reviews count cell */}
-                      <td className="py-4 px-4 text-center font-bold text-pink-600 dark:text-pink-400">
-                        {u.githubStats?.reviews || 0}
-                      </td>
-
-                      {/* Points cell */}
-                      <td className="py-4 px-4 text-right font-black text-slate-900 dark:text-white">
-                        {u.points?.totalPoints?.toLocaleString() || 0}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="8" className="py-12 text-center text-slate-400 dark:text-slate-500">
-                      <p className="text-sm font-bold">No results found</p>
-                      <p className="text-xs mt-1">
-                        Try adjusting your search criteria or filtering by a different language
-                      </p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      <td className="py-3 sm:py-4 px-2 sm:px-4 text-right font-black text-emerald-500 dark:text-emerald-400 text-xs sm:text-sm">{u.points?.referralPoints?.toLocaleString() || 0}</td>
+                    </>
+                  )}
+                </>
+                );
+              }}
+            />
+          ) : (
+            <div className="py-12 text-center text-slate-400 dark:text-slate-500">
+              <p className="text-sm font-bold">No results found</p>
+              <p className="text-xs mt-1">Try adjusting your search criteria or filtering by a different language</p>
+            </div>
           )}
         </div>
       </Card>
 
-      {/*  PAGINATION CONTROLS ADDED HERE  */}
+      {/* Pagination Controls */}
       {hasMore && (
         <div className="flex justify-center w-full mt-8 mb-4">
-          <button
-            onClick={loadMoreUsers}
-            disabled={loadingMore}
-            className="px-8 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-violet-500/30 flex items-center gap-2"
-          >
-            {loadingMore ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Loading...
-              </>
-            ) : (
-              "Load More Developers"
-            )}
+          <button onClick={loadMoreUsers} disabled={loadingMore} className="px-6 sm:px-8 py-2.5 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-violet-500/30 flex items-center gap-2">
+            {loadingMore ? <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />Loading...</> : "Load More"}
           </button>
         </div>
       )}
@@ -1012,8 +1136,6 @@ export const GitRank = () => {
           You've reached the end of the leaderboard! 🏆
         </div>
       )}
-      {/* 🚀 👆 YAHAN TAK 👆 🚀 */}
-
     </div>
   );
 };

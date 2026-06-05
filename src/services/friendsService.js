@@ -1,10 +1,12 @@
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, deleteDoc, onSnapshot, query, where, limit } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
-// Asynchronously fetch real users from Firebase
+// Asynchronously fetch real users from Firebase (capped at 50 to avoid
+// downloading the entire collection on every page load)
 export const fetchDevelopers = async () => {
   try {
-    const querySnapshot = await getDocs(collection(db, "users"));
+    const q = query(collection(db, "users"), limit(50));
+    const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => {
       const data = doc.data();
       return {
@@ -15,8 +17,8 @@ export const fetchDevelopers = async () => {
         role: data.role || "Developer",
         bio: data.bio || "Building awesome projects on RankerHub.",
         tags: data.skills || ["Developer"],
-        mutualFriends: Math.floor(Math.random() * 10), 
-        online: Math.random() > 0.5, 
+        mutualFriends: 0,
+        online: false,
         activity: "Recently joined RankerHub"
       };
     });
@@ -26,15 +28,50 @@ export const fetchDevelopers = async () => {
   }
 };
 
-export const toggleFollowStatus = (followingIds, developerId) => {
-  if (followingIds.includes(developerId)) {
-    return followingIds.filter((id) => id !== developerId);
+// Real-time listener for users the current user is following
+export const subscribeToFollowing = (currentUserId, callback) => {
+  if (!currentUserId) return () => {};
+  const q = query(collection(db, "follows"), where("followerId", "==", currentUserId));
+  return onSnapshot(q, (snapshot) => {
+    const followingIds = snapshot.docs.map(doc => doc.data().followedId);
+    callback(followingIds);
+  });
+};
+
+// Real-time listener for users following the current user
+export const subscribeToFollowers = (currentUserId, callback) => {
+  if (!currentUserId) return () => {};
+  const q = query(collection(db, "follows"), where("followedId", "==", currentUserId));
+  return onSnapshot(q, (snapshot) => {
+    const followerIds = snapshot.docs.map(doc => doc.data().followerId);
+    callback(followerIds);
+  });
+};
+
+// Toggle logic with Firestore
+export const toggleFollowStatus = async (currentUserId, developerId, isFollowing) => {
+  if (!currentUserId || !developerId) return;
+  const followDocId = `${currentUserId}_${developerId}`;
+  const followRef = doc(db, "follows", followDocId);
+
+  try {
+    if (isFollowing) {
+      // Unfollow
+      await deleteDoc(followRef);
+    } else {
+      // Follow
+      await setDoc(followRef, {
+        followerId: currentUserId,
+        followedId: developerId,
+        createdAt: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    console.error("Error toggling follow status:", error);
   }
-  return [...followingIds, developerId];
 };
 
 export const hydrateConnections = (developers, followingIds, followerIds) => {
-  // Defensive check in case developers is undefined during loading
   if (!developers) return { friends: [], followers: [], following: [], suggested: [] };
 
   const following = developers.filter((developer) => followingIds.includes(developer.id));

@@ -5,7 +5,6 @@ import {
   User,
   Calendar,
   Building2,
-  CheckCircle2,
   AlertCircle,
   HelpCircle,
   MapPin,
@@ -41,7 +40,7 @@ export const Onboarding = () => {
   const displayName = hasEditedName ? name : suggestedName;
   const [gender, setGender] = useState("");
   const [dob, setDob] = useState("");
-  const [city] = useState("Mumbai"); // Strictly Locked
+  const [city, setCity] = useState("");
   
   // Searchable college dropdown state
   const [collegeSearch, setCollegeSearch] = useState("");
@@ -89,14 +88,15 @@ export const Onboarding = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Helper to generate unique 6-character uppercase code
+  // Helper to generate a unique 6-character uppercase code using
+  // crypto.getRandomValues() for better randomness than Math.random()
   const generateReferralCode = () => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    let code = "";
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
+    const randomValues = new Uint8Array(6);
+    crypto.getRandomValues(randomValues);
+    return Array.from(randomValues)
+      .map((byte) => chars[byte % chars.length])
+      .join("");
   };
 
   const handleSelectCollege = (college) => {
@@ -150,8 +150,8 @@ export const Onboarding = () => {
       setIsLoading(false);
       return;
     }
-    if (!selectedCollege || !collegesList.includes(selectedCollege)) {
-      setError("Please select a college from the searchable dropdown list.");
+    if (!selectedCollege || !collegesList.includes(selectedCollege) || collegeSearch !== selectedCollege) {
+      setError("Please select a valid college from the searchable dropdown list.");
       setIsLoading(false);
       return;
     }
@@ -162,9 +162,26 @@ export const Onboarding = () => {
       return;
     }
 
+    if (linkedinUrl.trim()) {
+      const normalizedLinkedin = linkedinUrl.trim().toLowerCase();
+      const validPrefixes = ["https://linkedin.com/in/", "https://www.linkedin.com/in/"];
+      const isValidLinkedin = validPrefixes.some((prefix) => normalizedLinkedin.startsWith(prefix));
+      if (!isValidLinkedin) {
+        setError("LinkedIn URL must start with https://linkedin.com/in/ or https://www.linkedin.com/in/");
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    if (!city.trim()) {
+      setError("Please enter your city.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const activeUid = user.uid;
-      const githubUsername = userData?.githubUsername || user.reloadUserInfo?.screenName || "";
+      const githubUsername = (userData?.githubUsername || user.reloadUserInfo?.screenName || "").trim();
 
       if (!githubUsername) {
         throw new Error("Unable to identify your GitHub username from this session. Please log in again.");
@@ -193,6 +210,12 @@ export const Onboarding = () => {
         }
       }
 
+      if (!codeUnique) {
+        setError("Could not generate a unique referral code after multiple attempts. Please try again.");
+        setIsLoading(false);
+        return;
+      }
+
       // Referral variables
       let referrerUid = null;
       let referrerCodeClean = referralCode.trim().toUpperCase();
@@ -219,9 +242,28 @@ export const Onboarding = () => {
       }
 
       // 3. Execute isolated Firestore transaction
+      // Note: The referral code uniqueness check above (lines 196-217) prevents most
+      // collisions, but in high-concurrency scenarios two users might pass the check
+      // simultaneously. This transaction-level defensive check catches late collisions
+      // and throws an error, prompting the user to retry with a newly generated code.
       await runTransaction(db, async (transaction) => {
         const myUserRef = doc(db, "users", activeUid);
         const myReferralRef = doc(db, "referrals", activeUid);
+
+        // Defensive check: re-verify the referral code is still unique right before
+        // writing. If another user wrote the same code between our earlier check and
+        // now, we'll detect it here and throw, causing the onboarding to fail so the
+        // user can retry with a new code.
+        const myExistingUserDoc = await transaction.get(myUserRef);
+        if (myExistingUserDoc.exists()) {
+          throw new Error("Your account has already been set up. Please log in.");
+        }
+
+        const existingCodeQuery = query(collection(db, "users"), where("referralCode", "==", newReferralCode));
+        const existingCodeSnap = await getDocs(existingCodeQuery);
+        if (!existingCodeSnap.empty) {
+          throw new Error("Referral code collision detected. Please try onboarding again.");
+        }
 
         // Determine starting points
         let initialReferralPoints = 0;
@@ -241,7 +283,7 @@ export const Onboarding = () => {
           avatar: userData?.avatar || user.photoURL || "",
           gender,
           dob,
-          city: "Mumbai",
+          city: city.trim(),
           college: selectedCollege === "Other" ? customCollege.trim() : selectedCollege,
           linkedinUrl: linkedinUrl.trim() || "",
           instagramHandle: instagramHandle.trim().replace(/^@/, "") || "",
@@ -298,12 +340,17 @@ export const Onboarding = () => {
               totalEarned: currentTotalEarned + 100
             });
           } else {
-            // Safe fallback if index doc doesn't exist
-            transaction.set(referrerIndexRef, {
-              referralCode: referrerCodeClean,
-              usedBy: [activeUid],
-              totalEarned: 100
-            });
+            // Only create fallback if referrer user doc exists to prevent orphaned records
+            if (referrerDocSnap.exists()) {
+              transaction.set(referrerIndexRef, {
+                referralCode: referrerCodeClean,
+                usedBy: [activeUid],
+                totalEarned: 100
+              });
+            } else {
+              // Referrer user no longer exists, fail the transaction
+              throw new Error("Referrer user not found, unable to process referral");
+            }
           }
         }
 
@@ -357,7 +404,7 @@ export const Onboarding = () => {
               Finish Onboarding
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-              Create your gamified developer profile in the Mumbai college hub.
+              Create your gamified developer profile and join the leaderboard.
             </p>
           </div>
 
@@ -448,20 +495,18 @@ export const Onboarding = () => {
                 />
               </div>
 
-              {/* City (Strictly locked to Mumbai) */}
+              {/* City */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5" /> City (Mumbai Only)
+                  <MapPin className="w-3.5 h-3.5" /> City
                 </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={city}
-                    disabled
-                    className="w-full pl-4 pr-10 py-3 text-sm rounded-xl border border-slate-200/50 dark:border-slate-800/50 bg-slate-100/50 dark:bg-slate-900/40 text-slate-500 cursor-not-allowed font-extrabold focus:outline-none"
-                  />
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-3.5 top-1/2 -translate-y-1/2" />
-                </div>
+                <input
+                  type="text"
+                  placeholder="Enter your city"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="w-full px-4 py-3 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white/40 dark:bg-slate-950/20 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 dark:text-white transition-all placeholder:text-slate-400"
+                />
               </div>
 
             </div>
