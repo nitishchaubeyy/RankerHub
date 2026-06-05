@@ -818,7 +818,12 @@ export const GitRank = () => {
       {/* 2. Top 3 Contributors Grid (Dynamically adjust based on active tab) */}
       {!loadingUsers && topContributors.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {topContributors.map((u, idx) => (
+          {topContributors.map((u, idx) => {
+            const isCurrentUser = user && u.uid === user.uid;
+            const displayName = isCurrentUser ? (userData?.name || u.name) : u.name;
+            const displayAvatar = isCurrentUser ? (userData?.avatar || user?.photoURL || u.avatar) : u.avatar;
+
+            return (
             <Card
               key={u.uid}
               className={`
@@ -842,12 +847,12 @@ export const GitRank = () => {
                 </span>
 
                 <div className="w-16 h-16 rounded-2xl overflow-hidden ring-4 ring-violet-500/10 shadow-md">
-                  <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" />
+                  <img src={displayAvatar} alt={displayName} className="w-full h-full object-cover" />
                 </div>
 
                 <div>
                   <h4 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight">
-                    {u.name}
+                    {displayName}
                   </h4>
                   <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">
                     @{u.githubUsername}
@@ -895,7 +900,8 @@ export const GitRank = () => {
                 )}
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -1002,16 +1008,21 @@ export const GitRank = () => {
                   )}
                 </tr>
               )}
-              itemContent={(index, u) => (
+              itemContent={(index, u) => {
+                const isCurrentUser = user && u.uid === user.uid;
+                const displayName = isCurrentUser ? (userData?.name || u.name) : u.name;
+                const displayAvatar = isCurrentUser ? (userData?.avatar || user?.photoURL || u.avatar) : u.avatar;
+
+                return (
                 <>
                   <td className="py-3 sm:py-4 px-2 sm:px-4 font-bold text-slate-500">#{u.rank}</td>
                   <td className="py-3 sm:py-4 px-2 sm:px-4">
                     <div className="flex items-center gap-2 sm:gap-3">
                       <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg overflow-hidden flex-shrink-0">
-                        <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" />
+                        <img src={displayAvatar} alt={displayName} className="w-full h-full object-cover" />
                       </div>
                       <div className="min-w-0">
-                        <span className="font-extrabold text-slate-900 dark:text-white block group-hover:text-violet-500 transition-colors truncate text-xs sm:text-sm">{u.name}</span>
+                        <span className="font-extrabold text-slate-900 dark:text-white block group-hover:text-violet-500 transition-colors truncate text-xs sm:text-sm">{displayName}</span>
                         <span className="text-[9px] sm:text-[10px] text-slate-400 font-semibold block truncate">@{u.githubUsername}</span>
                       </div>
                     </div>
@@ -1044,7 +1055,8 @@ export const GitRank = () => {
                     </>
                   )}
                 </>
-              )}
+                );
+              }}
             />
           ) : (
             <div className="py-12 text-center text-slate-400 dark:text-slate-500">
