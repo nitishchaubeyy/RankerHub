@@ -1194,7 +1194,8 @@ export const CodingVerse = () => {
                   </div>
                 </div>
               ))}
-            </Card>
+            </div>
+          </Card>
           </motion.div>
         ) : (
           <motion.div
@@ -1262,24 +1263,23 @@ export const CodingVerse = () => {
       </AnimatePresence>
 
       {/* Oliver Mascot Daily Tip Card */}
-          <Card className="p-5 border-slate-200/50 dark:border-slate-800/50 select-none bg-slate-50/20 dark:bg-slate-950/20">
-            <div className="flex items-start gap-3">
-              <div className="text-2xl mt-0.5">🦉</div>
-              <div className="space-y-1">
-                <h4 className="text-xs font-black text-slate-950 dark:text-white uppercase tracking-wider my-0">
-                  Oliver's Arena Pro-Tip
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
-                  Always inspect scope evaluation and reference comparisons closely! In Java, check cached values; in Python, track shared default argument references. Speed is nice, but precision builds streaks.
-                </p>
-              </div>
-            </div>
-          </Card>
-
+      <Card className="p-5 border-slate-200/50 dark:border-slate-800/50 select-none bg-slate-50/20 dark:bg-slate-950/20">
+        <div className="flex items-start gap-3">
+          <div className="text-2xl mt-0.5">🦉</div>
+          <div className="space-y-1">
+            <h4 className="text-xs font-black text-slate-950 dark:text-white uppercase tracking-wider my-0">
+              Oliver's Arena Pro-Tip
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
+              Always inspect scope evaluation and reference comparisons closely! In Java, check cached values; in Python, track shared default argument references. Speed is nice, but precision builds streaks.
+            </p>
+          </div>
         </div>
+      </Card>
 
       </div>
     </div>
+  </div>
   );
 };
 
