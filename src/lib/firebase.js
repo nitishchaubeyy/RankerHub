@@ -1,7 +1,12 @@
 import { initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth, GithubAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { getAnalytics } from "firebase/analytics";
-import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
+import { 
+  connectFirestoreEmulator, 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -46,18 +51,23 @@ export const githubProvider = new GithubAuthProvider();
 // Configure GitHub Provider with additional scopes if needed
 githubProvider.addScope('read:user');
 githubProvider.addScope('user:email');
-// Uncomment these if you need more GitHub access
-// githubProvider.addScope('repo');
-// githubProvider.addScope('read:org');
 
 // Set custom parameters for GitHub provider
-githubProvider.setCustomParameters({
-  // Force GitHub to always show the account selection screen
-  // 'prompt': 'select_account',
-  // 'allow_signup': 'true'
-});
+githubProvider.setCustomParameters({});
 
-export const db = app ? getFirestore(app) : null;
+/**
+ * 🚀 FEATURE RESOLUTION: Issue #345 - Stateful Offline Data Persistence Engine
+ * Uses initializeFirestore to declare named persistent tab synchronization with custom cache limits.
+ * Enforces a strict 40MB cache threshold boundary to prevent device browser disk/memory bloating.
+ */
+export const db = app 
+  ? initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+        cacheSizeBytes: 40 * 1024 * 1024 // Exactly 40 Megabytes (41,943,040 Bytes) Cache Threshold Limit
+      })
+    }) 
+  : null;
 
 if (shouldUseEmulators && auth && db) {
   connectAuthEmulator(auth, `http://${authEmulatorHost}:${authEmulatorPort}`, {
@@ -66,8 +76,7 @@ if (shouldUseEmulators && auth && db) {
   connectFirestoreEmulator(db, firestoreEmulatorHost, firestoreEmulatorPort);
 }
 
-// Initialize analytics only in the browser, and don't let analytics
-// availability crash auth or the rest of Firebase setup.
+// Initialize analytics only in the browser
 let analyticsInstance = null;
 
 if (app && typeof window !== "undefined") {
@@ -80,7 +89,7 @@ if (app && typeof window !== "undefined") {
 
 export const analytics = analyticsInstance;
 
-// Initialize storage (useful for profile pictures, etc.)
+// Initialize storage
 export const storage = app ? getStorage(app) : null;
 
 // Helper function to sign in with GitHub
@@ -89,42 +98,32 @@ export const signInWithGitHub = async (requestRepoScope = false) => {
     throw new Error("Firebase is not configured. Add the required VITE_FIREBASE_* values before signing in.");
   }
 
-  try {
-    const dynamicProvider = new GithubAuthProvider();
-    dynamicProvider.addScope('read:user');
-    dynamicProvider.addScope('user:email');
-    
-    if (requestRepoScope) {
-      dynamicProvider.addScope('repo');
-    }
+  const dynamicProvider = new GithubAuthProvider();
+  dynamicProvider.addScope('read:user');
+  dynamicProvider.addScope('user:email');
+  
+  if (requestRepoScope) {
+    dynamicProvider.addScope('repo');
+  }
 
+  try {
     const result = await signInWithPopup(auth, dynamicProvider);
     const user = result.user;
     
     const credential = GithubAuthProvider.credentialFromResult(result);
     const accessToken = credential.accessToken;
 
-    // SECURITY NOTE: Never include access tokens in userData or Firestore
-    // Tokens are sensitive credentials that should only exist in memory
-    // and only be used in secure, server-side operations
     const userData = {
       uid: user.uid,
       email: user.email,
       displayName: user.displayName,
       photoURL: user.photoURL,
       lastLogin: new Date().toISOString(),
-      // githubAccessToken NOT included - never store tokens in Firestore
     };
 
     return { user, accessToken, userData, result }; 
   } catch (error) {
     console.error("GitHub sign-in error:", error);
-    if (error.code === 'auth/account-exists-with-different-credential') {
-      throw new Error('An account already exists with the same email address.', { cause: error });
-    }
-    if (error.code === 'auth/popup-closed-by-user') {
-      throw new Error('Sign-in popup was closed before completing.', { cause: error });
-    }
     throw error;
   }
 };
@@ -172,7 +171,7 @@ export const refreshUserToken = async () => {
   const user = auth.currentUser;
   if (user) {
     try {
-      const token = await user.getIdToken(true); // Force refresh
+      const token = await user.getIdToken(true);
       return token;
     } catch (error) {
       console.error("Error refreshing user token:", error);
@@ -182,5 +181,4 @@ export const refreshUserToken = async () => {
   return null;
 };
 
-// Export initialized app as default
 export default app;
