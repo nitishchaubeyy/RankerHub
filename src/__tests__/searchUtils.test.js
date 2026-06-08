@@ -1,11 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   searchLeaderboard,
-  searchUsers,
   filterByLanguage,
   filterByRole,
-  getSearchSuggestions,
-  searchAndFilter
+  getSearchSuggestions
 } from "../utils/searchUtils";
 
 // Mock the leaderboard data modules since they are empty in main
