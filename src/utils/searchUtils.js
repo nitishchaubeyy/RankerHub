@@ -17,8 +17,8 @@ export const searchLeaderboard = (query, includeWomen = false) => {
   }
 
   return allData.filter((user) => {
-    const name = user.name.toLowerCase();
-    const username = user.username.toLowerCase();
+    const name = (user.name || "").toLowerCase();
+    const username = (user.username || "").toLowerCase();
     const role = (user.role || "").toLowerCase();
     const language = (user.language || "").toLowerCase();
 
@@ -130,18 +130,21 @@ export const getSearchSuggestions = (users, query) => {
   const suggestions = new Set();
 
   users.forEach((user) => {
-    if (user.name.toLowerCase().startsWith(searchTerm)) {
+    const name = user.name || "";
+    const username = user.username || "";
+
+    if (name.toLowerCase().startsWith(searchTerm)) {
       suggestions.add({
         type: "name",
-        value: user.name,
-        display: `${user.name} (@${user.username})`
+        value: name,
+        display: `${name} (@${username})`
       });
     }
-    if (user.username.toLowerCase().startsWith(searchTerm)) {
+    if (username.toLowerCase().startsWith(searchTerm)) {
       suggestions.add({
         type: "username",
-        value: user.username,
-        display: `@${user.username}`
+        value: username,
+        display: `@${username}`
       });
     }
     if (user.language && user.language.toLowerCase().includes(searchTerm)) {
