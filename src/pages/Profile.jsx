@@ -1102,6 +1102,9 @@ export const Profile = () => {
             <GradientButton onClick={handleDownloadProfileCard} className="py-2.5 px-4 text-xs">
               Download Profile Card
             </GradientButton>
+            <GradientButton onClick={() => window.location.href='/dashboard/profile/card-builder'} className="py-2.5 px-4 text-xs bg-gradient-to-r from-blue-500 to-indigo-500">
+              Build GitHub DevCard
+            </GradientButton>
           </>
         )}
       </SectionHeader>

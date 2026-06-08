@@ -10,7 +10,7 @@ export const CodingOwl = () => {
   const { userData, purchaseMascot, equipMascot } = useAuth();
   const userName = userData?.name || "Developer";
   const loginStreak = userData?.streak || 0;
-  const githubStreak = userData?.githubStreak || 0; // New GitHub Live Streak
+  const githubStreak = userData?.githubStreak || 0;
   const hubCoins = userData?.hubCoins ?? 500;
   const inventory = userData?.inventory || ["oliver"];
   const activeMascotId = userData?.activeMascot || "oliver";
@@ -18,9 +18,43 @@ export const CodingOwl = () => {
 
   const [activeTab, setActiveTab] = useState("arena"); // "arena" | "shop"
   const [isProcessing, setIsProcessing] = useState(false);
-  const [habits, setHabits] = useState(habitCards);
-  const [timeLeft, setTimeLeft] = useState(1500); // 25:00 in seconds
-  const [timerActive, setTimerActive] = useState(false);
+
+  // --- Habit Checklist Persistence ---
+  const [habits, setHabits] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedHabits = localStorage.getItem("codingOwlHabits");
+      return savedHabits ? JSON.parse(savedHabits) : habitCards;
+    }
+    return habitCards;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("codingOwlHabits", JSON.stringify(habits));
+  }, [habits]);
+
+  // --- Pomodoro Persistence Logic (Strict React Purity Fix) ---
+  const [timeLeft, setTimeLeft] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedEndTime = localStorage.getItem("pomodoroEndTime");
+      if (savedEndTime) {
+        const remainingTime = Math.floor((parseInt(savedEndTime, 10) - Date.now()) / 1000);
+        if (remainingTime > 0) return remainingTime;
+      }
+    }
+    return 1500; // Default 25 mins
+  });
+
+  const [timerActive, setTimerActive] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedEndTime = localStorage.getItem("pomodoroEndTime");
+      if (savedEndTime) {
+        const remainingTime = Math.floor((parseInt(savedEndTime, 10) - Date.now()) / 1000);
+        if (remainingTime > 0) return true;
+        localStorage.removeItem("pomodoroEndTime");
+      }
+    }
+    return false;
+  });
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -30,6 +64,7 @@ export const CodingOwl = () => {
           if (prev <= 1) {
             clearInterval(timerRef.current);
             setTimerActive(false);
+            localStorage.removeItem("pomodoroEndTime");
             return 0;
           }
           return prev - 1;
@@ -44,12 +79,22 @@ export const CodingOwl = () => {
   }, [timerActive]);
 
   const toggleTimer = () => {
-    setTimerActive(!timerActive);
+    if (timerActive) {
+      // Pausing the timer
+      setTimerActive(false);
+      localStorage.removeItem("pomodoroEndTime");
+    } else {
+      // Starting/Resuming the timer
+      setTimerActive(true);
+      const endTime = Date.now() + timeLeft * 1000;
+      localStorage.setItem("pomodoroEndTime", endTime.toString());
+    }
   };
 
   const resetTimer = () => {
     setTimerActive(false);
     setTimeLeft(1500);
+    localStorage.removeItem("pomodoroEndTime");
   };
 
   const formatTime = (seconds) => {
@@ -59,14 +104,16 @@ export const CodingOwl = () => {
   };
 
   const toggleHabitComplete = (id) => {
-    setHabits(prev => prev.map(habit => {
-      if (habit.id === id) {
-        const newProgress = habit.progress === 100 ? 0 : 100;
-        const newStreak = newProgress === 100 ? habit.streak + 1 : Math.max(0, habit.streak - 1);
-        return { ...habit, progress: newProgress, streak: newStreak };
-      }
-      return habit;
-    }));
+    setHabits((prev) =>
+      prev.map((habit) => {
+        if (habit.id === id) {
+          const newProgress = habit.progress === 100 ? 0 : 100;
+          const newStreak = newProgress === 100 ? habit.streak + 1 : Math.max(0, habit.streak - 1);
+          return { ...habit, progress: newProgress, streak: newStreak };
+        }
+        return habit;
+      })
+    );
   };
 
   const handlePurchase = async (mascotId, price) => {
@@ -142,7 +189,6 @@ export const CodingOwl = () => {
       {activeTab === "arena" ? (
         <>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
         {/* Mascot bubble */}
         <Card className={`lg:col-span-2 p-8 flex flex-col sm:flex-row items-center gap-6 bg-gradient-to-br from-${activeMascotInfo.color}-500/10 via-slate-50/0 to-slate-50/0 dark:from-${activeMascotInfo.color}-500/5 dark:via-slate-900/0 dark:to-slate-900/0 border-${activeMascotInfo.color}-500/15`}>
           {/* Mascot representation */}
@@ -154,11 +200,11 @@ export const CodingOwl = () => {
             <h3 className="text-xl font-extrabold text-slate-950 dark:text-white my-0">
               Mascot: {activeMascotInfo.label}
             </h3>
-            
+
             <div className="bg-white/80 dark:bg-slate-950/60 p-4 rounded-xl border border-slate-200/40 dark:border-slate-800/45 text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-semibold italic relative">
               "Whoo-whoo! You've pushed code to GitHub for {githubStreak} consecutive days, {userName}. {activeMascotInfo.label} is proud! Maintain your live GitHub streak today to earn your +10 HubCoins daily bonus."
             </div>
-            
+
             <div className="flex justify-center sm:justify-start items-center gap-4 text-xs font-bold text-slate-400">
               <span>Mood: <span className={`text-${activeMascotInfo.color}-500`}>Ecstatic! 🔥</span></span>
               <span>•</span>
@@ -193,8 +239,8 @@ export const CodingOwl = () => {
             <button
               onClick={toggleTimer}
               className={`flex-1 py-2.5 rounded-xl font-bold border text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
-                timerActive 
-                  ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-500" 
+                timerActive
+                  ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-500"
                   : "bg-gradient-to-r from-orange-500 to-red-500 hover:opacity-90 text-white border-orange-500"
               }`}
             >
@@ -208,7 +254,6 @@ export const CodingOwl = () => {
             </button>
           </div>
         </Card>
-
       </div>
 
       {/* Habits Checklist Grid */}
@@ -216,7 +261,7 @@ export const CodingOwl = () => {
         <h3 className="font-extrabold text-lg text-slate-900 dark:text-white my-0">
           Your Habit Dashboard
         </h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {habits.map((habit) => (
             <Card key={habit.id} className="p-5 flex flex-col justify-between border-slate-200/50 dark:border-slate-800/50 hover:border-orange-500/25 transition-all">
@@ -225,7 +270,7 @@ export const CodingOwl = () => {
                   <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-orange-500/10 text-orange-500 dark:text-orange-400 border border-orange-500/20">
                     {habit.frequency}
                   </span>
-                  
+
                   <span className="text-xs font-bold text-orange-500 dark:text-orange-400 flex items-center gap-0.5">
                     🔥 {habit.streak}d
                   </span>
@@ -234,7 +279,7 @@ export const CodingOwl = () => {
                 <h4 className="font-extrabold text-slate-900 dark:text-white leading-tight my-0">
                   {habit.title}
                 </h4>
-                
+
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
                   {habit.description}
                 </p>
@@ -248,7 +293,7 @@ export const CodingOwl = () => {
                     {habit.progress === 100 ? "Completed" : "In Progress"}
                   </span>
                 </div>
-                
+
                 <button
                   onClick={() => toggleHabitComplete(habit.id)}
                   className={`w-full py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
@@ -293,7 +338,7 @@ export const CodingOwl = () => {
               <span className="text-xs font-bold text-slate-400 block text-center">
                 Week {week.week}
               </span>
-              
+
               <div className="flex justify-between items-center gap-1.5 py-3 px-4 rounded-xl bg-slate-50 dark:bg-slate-950/30 border border-slate-200/40 dark:border-slate-800/40">
                 {week.days.map((day, dayIdx) => (
                   <div
@@ -302,8 +347,8 @@ export const CodingOwl = () => {
                       day === 2
                         ? "bg-gradient-to-r from-orange-500 to-red-500 shadow-md shadow-orange-500/20"
                         : day === 1
-                          ? "bg-orange-500/40 dark:bg-orange-500/20"
-                          : "bg-slate-200 dark:bg-slate-800/50"
+                        ? "bg-orange-500/40 dark:bg-orange-500/20"
+                        : "bg-slate-200 dark:bg-slate-800/50"
                     }`}
                     title={`Day status: ${day}`}
                   />
@@ -398,7 +443,6 @@ export const CodingOwl = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };

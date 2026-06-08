@@ -73,7 +73,7 @@ export const GitRank = () => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingUsers(true);
 
-    // Build the query dynamically based on Active Tab
+// Build the query dynamically based on Active Tab and Tie-Breakers
     const constraints = [
       where("onboardingStatus", "==", "complete"),
     ];
@@ -131,6 +131,7 @@ export const GitRank = () => {
     try {
       const constraints = [
         where("onboardingStatus", "==", "complete"),
+
       ];
 
       if (activeTab === "gitrank") {
@@ -372,7 +373,7 @@ export const GitRank = () => {
     return `${mins}m ${secs}s`;
   };
 
-  // Filter leaderboard lists (Only Search is client side now)
+// Filter leaderboard lists (Only Search is client side now)
   const filteredData = useMemo(() => {
     return usersList.filter((u) => {
       const name = u.name || "";
@@ -387,7 +388,7 @@ export const GitRank = () => {
     return usersList.slice(0, 3);
   }, [usersList]);
 
-  // Chart Parsing
+  // Chart Parsing 1: Weekly Activity
   const weeklyActivityData = useMemo(() => {
     const weeks = Array.from({ length: 8 }, (_, idx) => {
       const start = new Date();
@@ -415,8 +416,9 @@ export const GitRank = () => {
     return weeks;
   }, [events]);
 
+// Chart Parsing 2: Languages Frequency
   const languageChartData = useMemo(() => {
-    if (!repos.length) return []; 
+    if (!repos.length) return [];
     
     const counts = {};
     repos.forEach((r) => {
@@ -449,6 +451,7 @@ export const GitRank = () => {
       .slice(0, 5);
   }, [repos]);
 
+  // Chart Parsing 3: Repository Contributions
   const repositoryContributionData = useMemo(() => {
     if (!events.length) return [];
 
