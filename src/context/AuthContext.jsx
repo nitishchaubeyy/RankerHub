@@ -45,7 +45,7 @@ const checkAndUpdateStreak = async (data, docRef) => {
       const currentNow = new Date();
       const latestLastLogin = latestData.lastLogin ? new Date(latestData.lastLogin) : null;
 
-      // GUARD 2 (Server-side Atomic Check):
+      //  GUARD 2 (Server-side Atomic Check):
       if (latestLastLogin && latestLastLogin.toDateString() === currentNow.toDateString()) {
         return;
       }
@@ -91,6 +91,7 @@ const checkAndUpdateStreak = async (data, docRef) => {
     console.error("Failed to update streak atomically:", err);
   }
 };
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
