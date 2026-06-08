@@ -72,6 +72,25 @@ describe("searchUtils", () => {
       // Guest User match
       expect(suggestions.some(s => s.value === "Guest User")).toBe(true);
     });
+
+    it("should prevent duplicate suggestions when multiple users match the same suggestion value", () => {
+      const usersWithDupes = [
+        { name: "Alice Smith", username: "alice", language: "JavaScript" },
+        { name: "Alice Smith", username: "alice2", language: "JavaScript" },
+        { name: "Bob Jones", username: "bob", language: "Python" }
+      ];
+      // Search for language "JavaScript" where multiple users have it
+      const suggestions = getSearchSuggestions(usersWithDupes, "java");
+      const jsSuggestions = suggestions.filter(s => s.type === "language");
+      expect(jsSuggestions.length).toBe(1);
+      expect(jsSuggestions[0].value).toBe("JavaScript");
+
+      // Search for name "Alice Smith" where multiple users share the name
+      const nameSuggestions = getSearchSuggestions(usersWithDupes, "alice");
+      const nameMatches = nameSuggestions.filter(s => s.type === "name");
+      expect(nameMatches.length).toBe(1);
+      expect(nameMatches[0].display).toBe("Alice Smith (@alice)"); // First occurrence is preserved
+    });
   });
 
   describe("filterByLanguage and filterByRole", () => {
