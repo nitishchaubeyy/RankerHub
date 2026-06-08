@@ -64,7 +64,8 @@ const checkAndUpdateStreak = async (data, docRef) => {
         longestStreak: newLongestStreak,
         lastLogin: now.toISOString(),
         "points.streakPoints": newStreakPoints,
-        "points.totalPoints": newTotalPoints
+        "points.totalPoints": newTotalPoints,
+        hubCoins: (data.hubCoins || 0) + 10
       });
       console.log("Streak updated successfully. New Streak:", newStreak, "| Longest:", newLongestStreak);
     } catch (err) {
@@ -281,6 +282,9 @@ export const AuthProvider = ({ children }) => {
             auditorPoints: 0,
             totalPoints: 10
           },
+          hubCoins: 500,
+          inventory: ["oliver"],
+          activeMascot: "oliver",
           lastAuditReward: null
         };
         await setDoc(userDocRef, skeletalUser);
@@ -349,6 +353,51 @@ export const AuthProvider = ({ children }) => {
       console.error("Logout failure:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const purchaseMascot = async (mascotId, price) => {
+    if (!user || !userData) throw new Error("Not authenticated");
+    const currentCoins = userData.hubCoins ?? 500;
+    if (currentCoins < price) {
+      throw new Error("Insufficient HubCoins");
+    }
+    const currentInventory = userData.inventory || ["oliver"];
+    if (currentInventory.includes(mascotId)) {
+      throw new Error("Mascot already owned");
+    }
+    
+    try {
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, {
+        hubCoins: currentCoins - price,
+        inventory: [...currentInventory, mascotId],
+        updatedAt: new Date().toISOString() // needed for firestore rules sometimes
+      });
+      console.log(`Purchased mascot ${mascotId}`);
+    } catch (err) {
+      console.error("Failed to purchase mascot:", err);
+      throw err;
+    }
+  };
+
+  const equipMascot = async (mascotId) => {
+    if (!user || !userData) throw new Error("Not authenticated");
+    const currentInventory = userData.inventory || ["oliver"];
+    if (!currentInventory.includes(mascotId)) {
+      throw new Error("Mascot not owned");
+    }
+    
+    try {
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, {
+        activeMascot: mascotId,
+        updatedAt: new Date().toISOString()
+      });
+      console.log(`Equipped mascot ${mascotId}`);
+    } catch (err) {
+      console.error("Failed to equip mascot:", err);
+      throw err;
     }
   };
 
@@ -568,7 +617,7 @@ const getTimestamp = (val) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, isOnboarding, login, logout, fetchGitHubStats, syncGitHubData, ghAccessToken, setUserData }}>
+    <AuthContext.Provider value={{ user, userData, loading, isOnboarding, login, logout, fetchGitHubStats, syncGitHubData, ghAccessToken, setUserData, purchaseMascot, equipMascot }}>
       {children}
     </AuthContext.Provider>
   );
