@@ -66,7 +66,7 @@ export const Achievements = () => {
 
   // Calculate dynamic progress mapping for the 4 badges
   const badgeProgress = {
-    b1: { unlocked: true, unlockedAt: "May 10, 2026", progress: 100, current: 1, target: 1, label: "First 100 users whitelist" },
+    b1: { unlocked: false, unlockedAt: null, progress: 0, current: 0, target: 1, label: "First 100 users whitelist" },
     b2: { 
       unlocked: commits >= 100, 
       unlockedAt: commits >= 100 ? "Verified" : null, 
