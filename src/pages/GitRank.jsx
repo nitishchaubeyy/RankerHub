@@ -1078,23 +1078,24 @@ export const GitRank = () => {
               }}
               fixedHeaderContent={() => (
                 <tr className="border-b border-slate-100 dark:border-slate-800/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-white dark:bg-slate-950 z-10 relative shadow-sm">
-                  <th className="py-3 px-2 sm:px-4">Rank</th>
-                  <th className="py-3 px-2 sm:px-4">Developer</th>
-                  <th className="py-3 px-2 sm:px-4">Language</th>
+                  {/* ADDED: scope="col" for table headers */}
+                  <th scope="col" className="py-3 px-2 sm:px-4">Rank</th>
+                  <th scope="col" className="py-3 px-2 sm:px-4">Developer</th>
+                  <th scope="col" className="py-3 px-2 sm:px-4">Language</th>
                   
                   {/* DYNAMIC COLUMNS BASED ON ACTIVE TAB */}
                   {activeTab === "gitrank" ? (
                     <>
-                      <th className="py-3 px-2 sm:px-4 text-center">Commits</th>
-                      <th className="py-3 px-2 sm:px-4 text-center">PRs</th>
-                      <th className="py-3 px-2 sm:px-4 text-center">Reviews</th>
-                      <th className="py-3 px-2 sm:px-4 text-right">Git Points</th>
+                      <th scope="col" className="py-3 px-2 sm:px-4 text-center">Commits</th>
+                      <th scope="col" className="py-3 px-2 sm:px-4 text-center">PRs</th>
+                      <th scope="col" className="py-3 px-2 sm:px-4 text-center">Reviews</th>
+                      <th scope="col" className="py-3 px-2 sm:px-4 text-right">Git Points</th>
                     </>
                   ) : (
                     <>
-                      <th className="py-3 px-2 sm:px-4 text-center">Invites Sent</th>
-                      <th className="py-3 px-2 sm:px-4 text-center">Recruiter Status</th>
-                      <th className="py-3 px-2 sm:px-4 text-right">Referral Points</th>
+                      <th scope="col" className="py-3 px-2 sm:px-4 text-center">Invites Sent</th>
+                      <th scope="col" className="py-3 px-2 sm:px-4 text-center">Recruiter Status</th>
+                      <th scope="col" className="py-3 px-2 sm:px-4 text-right">Referral Points</th>
                     </>
                   )}
                 </tr>
@@ -1106,7 +1107,10 @@ export const GitRank = () => {
 
                 return (
                 <>
-                  <td className="py-3 sm:py-4 px-2 sm:px-4 font-bold text-slate-500">#{u.rank}</td>
+                  {/* ADDED: scope="row" and role="rowheader" for screen readers */}
+                  <th scope="row" role="rowheader" className="py-3 sm:py-4 px-2 sm:px-4 font-bold text-slate-500 text-left">
+                    #{u.rank}
+                  </th>
                   <td className="py-3 sm:py-4 px-2 sm:px-4">
                     <div className="flex items-center gap-2 sm:gap-3">
                       <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg overflow-hidden flex-shrink-0">
