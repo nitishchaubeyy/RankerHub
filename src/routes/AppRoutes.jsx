@@ -1,3 +1,4 @@
+import OfflineBanner from "../components/ui/OfflineBanner";
 import React, { Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -174,6 +175,7 @@ export const AppRoutes = () => {
         </Suspense>
       </FirestoreCacheProvider>
       <GlobalModals />
+      <OfflineBanner />
     </>
   );
 };
